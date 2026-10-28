@@ -1,0 +1,149 @@
+// prisma/schema.prisma
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql" // atau "sqlite" jika kamu pakai sqlite
+  url      = env("DATABASE_URL")
+}
+
+// ==========================================
+// 1. ENUMS (Tipe Data Khusus)
+// ==========================================
+enum OrderStatus {
+  QUEUE
+  WORKING
+  APPROVAL
+  READY
+}
+
+enum ItemType {
+  JASA
+  SPAREPART
+}
+
+enum PaymentMethod {
+  TUNAI
+  QRIS
+  SPLIT
+}
+
+// ==========================================
+// 2. TABEL MEKANIK
+// ==========================================
+model Mechanic {
+  id        String   @id @default(cuid())
+  code      String   @unique // Contoh: MK-001
+  name      String
+  initials  String
+  color     String
+  isActive  Boolean  @default(true)
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orders       Order[]
+  transactions Transaction[]
+}
+
+// ==========================================
+// 3. TABEL SPAREPART
+// ==========================================
+model Sparepart {
+  id        String   @id @default(cuid())
+  code      String   @unique
+  name      String
+  category  String
+  stock     Int
+  minStock  Int
+  price     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+
+  orderItems OrderItem[]
+}
+
+// ==========================================
+// 4. TABEL ORDER (PESANAN)
+// ==========================================
+model Order {
+  id            String      @id @default(cuid())
+  trackingToken String      @unique // Token rahasia untuk pelanggan
+  vehicle       String
+  plate         String?
+  customerName  String?
+  customerPhone String?
+  issue         String
+  status        OrderStatus @default(QUEUE)
+  color         String
+  
+  // Relasi ke Mekanik
+  mechanicId    String?
+  mechanic      Mechanic?   @relation(fields: [mechanicId], references: [id])
+
+  createdAt     DateTime    @default(now())
+  updatedAt     DateTime    @updatedAt
+
+  items         OrderItem[]
+  transactions  Transaction[]
+}
+
+// ==========================================
+// 5. TABEL ORDER ITEM (Rincian Barang/Jasa)
+// ==========================================
+model OrderItem {
+  id          String   @id @default(cuid())
+  orderId     String
+  order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
+  
+  type        ItemType
+  name        String
+  price       Int
+  qty         Int
+  
+  // Relasi ke Sparepart (Opsional, null jika ini Jasa)
+  sparepartId String?
+  sparepart   Sparepart? @relation(fields: [sparepartId], references: [id])
+
+  isAdditional Boolean @default(false) // Penanda biaya tambahan (extra)
+}
+
+// ==========================================
+// 6. TABEL TRANSAKSI (Pembayaran)
+// ==========================================
+model Transaction {
+  id          String        @id @default(cuid())
+  orderId     String?
+  order       Order?        @relation(fields: [orderId], references: [id], onDelete: SetNull)
+  
+  date        DateTime      @default(now())
+  type        String        // "Servis" atau "Sparepart"
+  method      PaymentMethod @default(TUNAI)
+  total       Int
+  serviceAmount Int
+  partsAmount Int
+  commission  Int
+
+  // Relasi ke Mekanik
+  mechanicId  String?
+  mechanic    Mechanic?     @relation(fields: [mechanicId], references: [id])
+}
+
+// ==========================================
+// 7. TABEL PENGATURAN KOMISI (Tetap dipertahankan)
+// ==========================================
+model CommissionSetting {
+  id             String   @id @default("global")
+  servicePercent Int      @default(10)
+  partsPercent   Int      @default(0)
+  updatedAt      DateTime @updatedAt
+}
+
+model CommissionOverride {
+  id             String   @id @default(cuid())
+  mechanicId     String   @unique
+  servicePercent Int?
+  partsPercent   Int?
+  updatedAt      DateTime @updatedAt
+}

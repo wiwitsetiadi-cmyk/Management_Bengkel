@@ -1,0 +1,36 @@
+# ==============================
+# BACKEND .gitignore
+# ==============================
+
+# 1. Dependencies
+node_modules/
+
+# 2. Environment Variables (SANGAT RAHASIA - JANGAN SAMPAI MASUK GITHUB)
+.env
+.env.local
+.env.*
+!.env.example
+
+# 3. Database Lokal (Jika pakai SQLite)
+*.db
+*.sqlite
+*.sqlite3
+prisma/dev.db
+prisma/dev.db-journal
+
+# 4. Build Output (Hasil compile TypeScript)
+dist/
+build/
+
+# 5. Folder AI Tools & Editor (Milik kamu sendiri, bukan proyek)
+.agents/
+.claude/
+.cursor/
+.devin/
+.vscode/
+.idea/
+
+# 6. Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
