@@ -968,14 +968,14 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brand-700);
 .reports-commission-total { min-height: 48px; padding: 0 16px; display: grid; grid-template-columns: minmax(160px, 1.5fr) 90px 120px 130px 110px; align-items: center; gap: 10px; border-top: 2px solid var(--neutral-300); background: var(--neutral-100); font-size: 14px; font-weight: 700; color: var(--neutral-900); }
 
 /* =========================================
-   PERBAIKAN GRAFIK: SEJAJAR KE BAWAH
+   PERBAIKAN GRAFIK: AGAR TOOLTIP TIDAK TERPOTONG
    ========================================= */
 .reports-chart { 
   display: flex; 
   align-items: flex-end; 
   gap: 12px; 
-  height: 200px; /* Sedikit dilebihkan agar ruang label pas */
-  padding: 20px 0 24px; /* Padding bawah untuk ruang label */
+  height: 240px; /* Tinggi wadah ditambah */
+  padding: 60px 0 24px; /* Padding atas 60px memberikan ruang untuk tooltip */
   border-bottom: 1px solid var(--neutral-300); 
   overflow-x: auto; 
   margin-bottom: 10px;
@@ -985,7 +985,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brand-700);
   flex: 0 0 40px; 
   display: flex; 
   flex-direction: column;
-  justify-content: flex-end; /* KUNCI PERBAIKAN: Menempel ke bawah */
+  justify-content: flex-end;
   align-items: center; 
   position: relative; 
   height: 100%; 
@@ -1004,14 +1004,33 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brand-700);
 
 .reports-chart-label { 
   position: absolute;
-  bottom: -24px; /* Posisi label di bawah garis dasar */
+  bottom: -24px;
   font-size: 11px; 
   color: var(--neutral-600); 
   font-weight: 500; 
   white-space: nowrap;
 }
 
-.reports-chart-tooltip { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); padding: 5px 10px; color: white; background: var(--brand-900); border-radius: 6px; font-size: 11px; font-weight: 600; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .15s ease; font-variant-numeric: tabular-nums; z-index: 10; margin-bottom: 8px;}
+.reports-chart-tooltip { 
+  position: absolute; 
+  bottom: 100%; 
+  left: 50%; 
+  transform: translateX(-50%); 
+  padding: 6px 10px; 
+  color: white; 
+  background: var(--brand-900); 
+  border-radius: 6px; 
+  font-size: 11px; 
+  font-weight: 600; 
+  white-space: nowrap; 
+  opacity: 0; 
+  pointer-events: none; 
+  transition: opacity .15s ease; 
+  font-variant-numeric: tabular-nums; 
+  z-index: 10; 
+  margin-bottom: 8px;
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15); /* Tambahan: bayangan agar lebih menonjol */
+}
 .reports-chart-tooltip.visible { opacity: 1; }
 
 .reports-tx-table { overflow-x: auto; }
