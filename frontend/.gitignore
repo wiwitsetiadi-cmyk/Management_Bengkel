@@ -14,12 +14,12 @@ node_modules
 dist
 dist-ssr
 build
-.vite/        <-- TAMBAHAN: Cache dari Vite
+.vite/     
 
 # Environment Variables
 *.local
 .env
-.env.*        <-- TAMBAHAN: Mengabaikan semua file .env
+.env.*        
 
 # Editor directories and files
 .vscode/*
