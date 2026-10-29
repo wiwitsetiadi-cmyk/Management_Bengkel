@@ -32,7 +32,7 @@ export default function ReportsPage({ transactions, showToast }: { transactions:
     const total = filteredTransactions.reduce((sum, t) => sum + t.total, 0);
     const serviceTotal = filteredTransactions.reduce((sum, t) => sum + t.serviceAmount, 0);
     const partsTotal = filteredTransactions.reduce((sum, t) => sum + t.partsAmount, 0);
-    const cashTotal = filteredTransactions.reduce((sum, t) => sum + t.total, 0); // Asumsi semua tunai untuk MVP
+    const cashTotal = filteredTransactions.reduce((sum, t) => sum + t.total, 0);
     return { total, serviceTotal, partsTotal, cashTotal, count: filteredTransactions.length };
   }, [filteredTransactions]);
 
@@ -54,15 +54,23 @@ export default function ReportsPage({ transactions, showToast }: { transactions:
 
   const totalCommission = commissionData.reduce((sum, m) => sum + m.commission, 0);
 
+  // PERBAIKAN BUG GRAFIK: Gunakan getLocalDateISO dan tambahkan format tanggal lengkap
   const chartData = useMemo(() => {
     const revenueByDate: Record<string, number> = {};
     filteredTransactions.forEach((t) => {
-      const dateStr = new Date(t.date).toISOString().split('T')[0];
+      const dateStr = getLocalDateISO(new Date(t.date)); // <-- Fix Timezone
       revenueByDate[dateStr] = (revenueByDate[dateStr] || 0) + t.total;
     });
-    return Object.keys(revenueByDate).sort().map((date) => ({
-      date, label: date.slice(-2), amount: revenueByDate[date],
-    }));
+    
+    return Object.keys(revenueByDate).sort().map((date) => {
+      const [y, m, d] = date.split('-');
+      return {
+        date,
+        label: d,
+        fullDate: `${d}/${m}/${y}`,
+        amount: revenueByDate[date],
+      };
+    });
   }, [filteredTransactions]);
 
   const maxChartAmount = Math.max(...chartData.map((d) => d.amount), 1);
@@ -141,7 +149,7 @@ export default function ReportsPage({ transactions, showToast }: { transactions:
             <div className="reports-chart">
               {chartData.map((d, i) => (
                 <div key={d.date} className="reports-chart-bar-wrap" onMouseEnter={() => setHoveredBar(i)} onMouseLeave={() => setHoveredBar(null)}>
-                  <div className={`reports-chart-tooltip ${hoveredBar === i ? 'visible' : ''}`}>{formatRupiah(d.amount)}</div>
+                  <div className={`reports-chart-tooltip ${hoveredBar === i ? 'visible' : ''}`}>{d.fullDate} · {formatRupiah(d.amount)}</div>
                   <div className="reports-chart-bar" style={{ height: `${(d.amount / maxChartAmount) * 100}%` }} />
                   <span className="reports-chart-label">{d.label}</span>
                 </div>
