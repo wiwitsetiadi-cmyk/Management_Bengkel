@@ -967,24 +967,26 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brand-700);
 .reports-commission-detail-commission { color: var(--brand-700); font-weight: 600; }
 .reports-commission-total { min-height: 48px; padding: 0 16px; display: grid; grid-template-columns: minmax(160px, 1.5fr) 90px 120px 130px 110px; align-items: center; gap: 10px; border-top: 2px solid var(--neutral-300); background: var(--neutral-100); font-size: 14px; font-weight: 700; color: var(--neutral-900); }
 
-/* PERBAIKAN GRAFIK */
+/* =========================================
+   PERBAIKAN GRAFIK: SEJAJAR KE BAWAH
+   ========================================= */
 .reports-chart { 
   display: flex; 
   align-items: flex-end; 
   gap: 12px; 
-  height: 180px; 
-  padding: 20px 0 0; 
+  height: 200px; /* Sedikit dilebihkan agar ruang label pas */
+  padding: 20px 0 24px; /* Padding bawah untuk ruang label */
   border-bottom: 1px solid var(--neutral-300); 
   overflow-x: auto; 
-  padding-bottom: 10px;
+  margin-bottom: 10px;
 }
 
 .reports-chart-bar-wrap { 
   flex: 0 0 40px; 
   display: flex; 
-  flex-direction: column; 
+  flex-direction: column;
+  justify-content: flex-end; /* KUNCI PERBAIKAN: Menempel ke bawah */
   align-items: center; 
-  gap: 8px; 
   position: relative; 
   height: 100%; 
 }
@@ -999,8 +1001,17 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brand-700);
 }
 
 .reports-chart-bar-wrap:hover .reports-chart-bar { opacity: .8; }
-.reports-chart-label { font-size: 11px; color: var(--neutral-600); font-weight: 500; }
-.reports-chart-tooltip { position: absolute; bottom: calc(100% + 4px); left: 50%; transform: translateX(-50%); padding: 5px 10px; color: white; background: var(--brand-900); border-radius: 6px; font-size: 11px; font-weight: 600; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .15s ease; font-variant-numeric: tabular-nums; z-index: 10; }
+
+.reports-chart-label { 
+  position: absolute;
+  bottom: -24px; /* Posisi label di bawah garis dasar */
+  font-size: 11px; 
+  color: var(--neutral-600); 
+  font-weight: 500; 
+  white-space: nowrap;
+}
+
+.reports-chart-tooltip { position: absolute; bottom: 100%; left: 50%; transform: translateX(-50%); padding: 5px 10px; color: white; background: var(--brand-900); border-radius: 6px; font-size: 11px; font-weight: 600; white-space: nowrap; opacity: 0; pointer-events: none; transition: opacity .15s ease; font-variant-numeric: tabular-nums; z-index: 10; margin-bottom: 8px;}
 .reports-chart-tooltip.visible { opacity: 1; }
 
 .reports-tx-table { overflow-x: auto; }
