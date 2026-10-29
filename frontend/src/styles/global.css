@@ -974,8 +974,8 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brand-700);
   display: flex; 
   align-items: flex-end; 
   gap: 12px; 
-  height: 240px; /* Tinggi wadah ditambah */
-  padding: 60px 0 24px; /* Padding atas 60px memberikan ruang untuk tooltip */
+  height: 240px; 
+  padding: 60px 40px 24px; /* Padding Kiri & Kanan 40px */
   border-bottom: 1px solid var(--neutral-300); 
   overflow-x: auto; 
   margin-bottom: 10px;
@@ -1029,7 +1029,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brand-700);
   font-variant-numeric: tabular-nums; 
   z-index: 10; 
   margin-bottom: 8px;
-  box-shadow: 0 4px 12px rgba(0,0,0,0.15); /* Tambahan: bayangan agar lebih menonjol */
+  box-shadow: 0 4px 12px rgba(0,0,0,0.15); 
 }
 .reports-chart-tooltip.visible { opacity: 1; }
 
