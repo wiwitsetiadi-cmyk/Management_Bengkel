@@ -450,6 +450,11 @@ app.put('/api/commission', requireAuth, async (req, res) => {
   res.json({ success: true });
 });
 
+app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
+  console.error('Unhandled Error:', err);
+  res.status(500).json({ error: 'Terjadi kesalahan internal pada server.' });
+});
+
 // ==========================================
 // JALANKAN SERVER
 // ==========================================
