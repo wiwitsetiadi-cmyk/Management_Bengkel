@@ -54,20 +54,18 @@ export default function ReportsPage({ transactions, showToast }: { transactions:
 
   const totalCommission = commissionData.reduce((sum, m) => sum + m.commission, 0);
 
-  // PERBAIKAN BUG GRAFIK: Gunakan getLocalDateISO dan tambahkan format tanggal lengkap
   const chartData = useMemo(() => {
     const revenueByDate: Record<string, number> = {};
     filteredTransactions.forEach((t) => {
-      const dateStr = getLocalDateISO(new Date(t.date)); // <-- Fix Timezone
+      const dateStr = getLocalDateISO(new Date(t.date));
       revenueByDate[dateStr] = (revenueByDate[dateStr] || 0) + t.total;
     });
     
     return Object.keys(revenueByDate).sort().map((date) => {
-      const [y, m, d] = date.split('-');
+      const parts = date.split('-');
       return {
         date,
-        label: d,
-        fullDate: `${d}/${m}/${y}`,
+        label: parts[2], // Hanya ambil tanggal (DD)
         amount: revenueByDate[date],
       };
     });
@@ -149,7 +147,7 @@ export default function ReportsPage({ transactions, showToast }: { transactions:
             <div className="reports-chart">
               {chartData.map((d, i) => (
                 <div key={d.date} className="reports-chart-bar-wrap" onMouseEnter={() => setHoveredBar(i)} onMouseLeave={() => setHoveredBar(null)}>
-                  <div className={`reports-chart-tooltip ${hoveredBar === i ? 'visible' : ''}`}>{d.fullDate} · {formatRupiah(d.amount)}</div>
+                  <div className={`reports-chart-tooltip ${hoveredBar === i ? 'visible' : ''}`}>{formatRupiah(d.amount)}</div>
                   <div className="reports-chart-bar" style={{ height: `${(d.amount / maxChartAmount) * 100}%` }} />
                   <span className="reports-chart-label">{d.label}</span>
                 </div>
