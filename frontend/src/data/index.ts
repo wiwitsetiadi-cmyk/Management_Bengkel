@@ -23,6 +23,15 @@ export type Sparepart = {
   price: number;
 };
 
+// ============================================================
+// TAMBAHAN BARU: Tipe Data Katalog Servis
+// ============================================================
+export type Service = {
+  id: string;
+  name: string;
+  price: number;
+};
+
 export type OrderItem = {
   id: string;
   type: ItemType;
