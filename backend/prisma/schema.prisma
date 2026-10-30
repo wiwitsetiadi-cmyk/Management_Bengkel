@@ -147,3 +147,14 @@ model CommissionOverride {
   partsPercent   Int?
   updatedAt      DateTime @updatedAt
 }
+
+// ==========================================
+// 8. TABEL SERVICE (Katalog Jasa)
+// ==========================================
+model Service {
+  id        String   @id @default(cuid())
+  name      String
+  price     Int
+  createdAt DateTime @default(now())
+  updatedAt DateTime @updatedAt
+}
