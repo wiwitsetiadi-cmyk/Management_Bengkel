@@ -232,6 +232,72 @@ app.post('/api/spareparts/:id/restock', requireAuth, async (req, res) => {
 });
 
 // ==========================================
+// 5.1 ENDPOINT SERVICE (KATALOG JASA) - BARU
+// ==========================================
+app.get('/api/services', requireAuth, async (req, res) => {
+  try {
+    const services = await prisma.service.findMany({ orderBy: { name: 'asc' } });
+    res.json(services);
+  } catch (error) {
+    res.status(500).json({ error: 'Gagal mengambil data katalog servis.' });
+  }
+});
+
+app.post('/api/services', requireAuth, async (req, res) => {
+  try {
+    const { name, price } = req.body;
+    
+    // VALIDASI INPUT
+    if (!name?.trim()) {
+      return res.status(400).json({ error: 'Nama servis wajib diisi.' });
+    }
+    if (Number(price) < 0) {
+      return res.status(400).json({ error: 'Harga servis tidak boleh negatif.' });
+    }
+
+    const service = await prisma.service.create({ 
+      data: { name: name.trim(), price: Number(price) || 0 } 
+    });
+    res.status(201).json(service);
+  } catch (error) {
+    res.status(500).json({ error: 'Gagal menambah katalog servis.' });
+  }
+});
+
+app.put('/api/services/:id', requireAuth, async (req, res) => {
+  try {
+    const id = req.params.id as string;
+    const { name, price } = req.body;
+    
+    // VALIDASI INPUT
+    if (!name?.trim()) {
+      return res.status(400).json({ error: 'Nama servis wajib diisi.' });
+    }
+    if (Number(price) < 0) {
+      return res.status(400).json({ error: 'Harga servis tidak boleh negatif.' });
+    }
+
+    const service = await prisma.service.update({
+      where: { id }, 
+      data: { name: name.trim(), price: Number(price) || 0 }
+    });
+    res.json(service);
+  } catch (error) {
+    res.status(500).json({ error: 'Gagal update katalog servis.' });
+  }
+});
+
+app.delete('/api/services/:id', requireAuth, async (req, res) => {
+  try {
+    const id = req.params.id as string;
+    await prisma.service.delete({ where: { id } });
+    res.json({ success: true, message: 'Servis berhasil dihapus.' });
+  } catch (error) {
+    res.status(500).json({ error: 'Gagal menghapus katalog servis.' });
+  }
+});
+
+// ==========================================
 // 6. ENDPOINT ORDER (KANBAN & STATE MACHINE)
 // ==========================================
 app.get('/api/orders', requireAuth, async (req, res) => {
