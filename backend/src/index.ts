@@ -49,7 +49,7 @@ const requireAuth = (req: express.Request, res: express.Response, next: express.
   if (!payload) {
     return res.status(401).json({ error: 'Akses ditolak. Silakan login.' });
   }
-  next(); // Lanjutkan ke endpoint jika token valid
+  next();
 };
 
 app.use(cors());
@@ -58,11 +58,10 @@ app.use(express.json());
 // ==========================================
 // 2. STATE MACHINE & HELPER KOMISI
 // ==========================================
-// Aturan perpindahan status yang SAH
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   QUEUE: ['WORKING'],
   WORKING: ['APPROVAL', 'READY'],
-  APPROVAL: ['READY', 'WORKING'], // Bisa kembali ke WORKING jika pelanggan menolak
+  APPROVAL: ['READY', 'WORKING'],
   READY: [] 
 };
 
@@ -114,7 +113,13 @@ app.get('/api/mechanics', requireAuth, async (req, res) => {
 app.post('/api/mechanics', requireAuth, async (req, res) => {
   try {
     const { code, name, initials, color } = req.body;
-    const mechanic = await prisma.mechanic.create({ data: { code, name, initials, color } });
+    
+    // VALIDASI INPUT
+    if (!code?.trim() || !name?.trim() || !initials?.trim()) {
+      return res.status(400).json({ error: 'Kode, Nama, dan Inisial wajib diisi.' });
+    }
+
+    const mechanic = await prisma.mechanic.create({ data: { code: code.trim(), name: name.trim(), initials: initials.trim(), color } });
     res.json(mechanic);
   } catch (error) {
     res.status(400).json({ error: 'Kode mekanik mungkin sudah dipakai.' });
@@ -123,12 +128,17 @@ app.post('/api/mechanics', requireAuth, async (req, res) => {
 
 app.put('/api/mechanics/:id', requireAuth, async (req, res) => {
   try {
-    // FIX TYPESCRIPT: Tambahkan 'as string'
     const id = req.params.id as string;
     const { name, isActive } = req.body;
+    
+    // VALIDASI INPUT
+    if (!name?.trim()) {
+      return res.status(400).json({ error: 'Nama mekanik tidak boleh kosong.' });
+    }
+
     const mechanic = await prisma.mechanic.update({
       where: { id },
-      data: { name, isActive }
+      data: { name: name.trim(), isActive }
     });
     res.json(mechanic);
   } catch (error) {
@@ -147,7 +157,25 @@ app.get('/api/spareparts', requireAuth, async (req, res) => {
 app.post('/api/spareparts', requireAuth, async (req, res) => {
   try {
     const { code, name, category, price, stock, minStock } = req.body;
-    const part = await prisma.sparepart.create({ data: { code, name, category, price, stock, minStock } });
+    
+    // VALIDASI INPUT
+    if (!code?.trim() || !name?.trim() || !category?.trim()) {
+      return res.status(400).json({ error: 'Kode, Nama, dan Kategori wajib diisi.' });
+    }
+    if (Number(price) < 0 || Number(stock) < 0 || Number(minStock) < 0) {
+      return res.status(400).json({ error: 'Harga dan stok tidak boleh negatif.' });
+    }
+
+    const part = await prisma.sparepart.create({ 
+      data: { 
+        code: code.trim(), 
+        name: name.trim(), 
+        category: category.trim(), 
+        price: Number(price) || 0, 
+        stock: Number(stock) || 0, 
+        minStock: Number(minStock) || 0 
+      } 
+    });
     res.status(201).json(part);
   } catch (error) {
     res.status(400).json({ error: 'Kode sparepart sudah dipakai.' });
@@ -156,11 +184,27 @@ app.post('/api/spareparts', requireAuth, async (req, res) => {
 
 app.put('/api/spareparts/:id', requireAuth, async (req, res) => {
   try {
-    // FIX TYPESCRIPT: Tambahkan 'as string'
     const id = req.params.id as string;
     const { code, name, category, price, stock, minStock } = req.body;
+    
+    // VALIDASI INPUT
+    if (!code?.trim() || !name?.trim() || !category?.trim()) {
+      return res.status(400).json({ error: 'Kode, Nama, dan Kategori wajib diisi.' });
+    }
+    if (Number(price) < 0 || Number(stock) < 0 || Number(minStock) < 0) {
+      return res.status(400).json({ error: 'Harga dan stok tidak boleh negatif.' });
+    }
+
     const part = await prisma.sparepart.update({
-      where: { id }, data: { code, name, category, price, stock, minStock }
+      where: { id }, 
+      data: { 
+        code: code.trim(), 
+        name: name.trim(), 
+        category: category.trim(), 
+        price: Number(price) || 0, 
+        stock: Number(stock) || 0, 
+        minStock: Number(minStock) || 0 
+      }
     });
     res.json(part);
   } catch (error) {
@@ -170,11 +214,16 @@ app.put('/api/spareparts/:id', requireAuth, async (req, res) => {
 
 app.post('/api/spareparts/:id/restock', requireAuth, async (req, res) => {
   try {
-    // FIX TYPESCRIPT: Tambahkan 'as string'
     const id = req.params.id as string;
     const { qty } = req.body;
+    
+    // VALIDASI INPUT
+    if (Number(qty) <= 0) {
+      return res.status(400).json({ error: 'Jumlah restock harus lebih dari 0.' });
+    }
+
     const part = await prisma.sparepart.update({
-      where: { id }, data: { stock: { increment: qty } }
+      where: { id }, data: { stock: { increment: Number(qty) } }
     });
     res.json(part);
   } catch (error) {
@@ -186,7 +235,6 @@ app.post('/api/spareparts/:id/restock', requireAuth, async (req, res) => {
 // 6. ENDPOINT ORDER (KANBAN & STATE MACHINE)
 // ==========================================
 app.get('/api/orders', requireAuth, async (req, res) => {
-  // Ambil pesanan beserta item dan mekaniknya
   const orders = await prisma.order.findMany({
     include: {
       items: { include: { sparepart: true } },
@@ -201,25 +249,41 @@ app.post('/api/orders', requireAuth, async (req, res) => {
   try {
     const { vehicle, plate, issue, color, mechanicId, items } = req.body;
     
-    // Generate Token Rahasia untuk Pelanggan
+    // VALIDASI INPUT
+    if (!vehicle?.trim()) {
+      return res.status(400).json({ error: 'Model kendaraan wajib diisi.' });
+    }
+    if (!mechanicId) {
+      return res.status(400).json({ error: 'Mekanik wajib dipilih.' });
+    }
+    if (!items || items.length === 0) {
+      return res.status(400).json({ error: 'Pesanan minimal harus memiliki 1 item.' });
+    }
+    
+    // Validasi setiap item
+    for (const item of items) {
+      if (!item.name?.trim() || Number(item.price) < 0 || Number(item.qty) <= 0) {
+        return res.status(400).json({ error: 'Data item tidak valid (nama kosong, harga negatif, atau qty <= 0).' });
+      }
+    }
+
     const trackingToken = crypto.randomUUID();
 
     const newOrder = await prisma.order.create({
       data: {
         trackingToken,
-        vehicle,
-        plate,
-        issue,
+        vehicle: vehicle.trim(),
+        plate: plate?.trim() || null,
+        issue: issue?.trim() || 'Servis Kendaraan',
         color,
-        status: 'QUEUE', // Selalu mulai dari QUEUE
+        status: 'QUEUE',
         mechanicId,
         items: {
-          // Nested write: Prisma otomatis membuat OrderItem
           create: items.map((item: any) => ({
-            type: item.type, // 'JASA' atau 'SPAREPART'
-            name: item.name,
-            price: item.price,
-            qty: item.qty,
+            type: item.type,
+            name: item.name.trim(),
+            price: Number(item.price) || 0,
+            qty: Number(item.qty) || 1,
             sparepartId: item.sparepartId || null,
             isAdditional: false
           }))
@@ -234,45 +298,50 @@ app.post('/api/orders', requireAuth, async (req, res) => {
   }
 });
 
-// ENDPOINT UPDATE STATUS (Menerapkan State Machine)
 app.put('/api/orders/:id/status', requireAuth, async (req, res) => {
   try {
     const id = req.params.id as string;
     const { status: newStatus, additionalItems } = req.body;
 
+    // VALIDASI STATUS
+    if (!newStatus || !Object.keys(ALLOWED_TRANSITIONS).includes(newStatus)) {
+      return res.status(400).json({ error: 'Status tidak valid.' });
+    }
+
     const currentOrder = await prisma.order.findUnique({ where: { id } });
     if (!currentOrder) return res.status(404).json({ error: 'Pesanan tidak ditemukan' });
 
-    // 1. VALIDASI STATE MACHINE
     if (!ALLOWED_TRANSITIONS[currentOrder.status]?.includes(newStatus)) {
       return res.status(400).json({ 
         error: `Transisi ilegal: Tidak bisa pindah dari ${currentOrder.status} ke ${newStatus}` 
       });
     }
 
-    // 2. SIMPAN ITEM TAMBAHAN (Jika ada dan transisi dari WORKING)
-    // Kita simpan baik mau ke APPROVAL (remote) maupun langsung ke READY (di tempat)
     if (currentOrder.status === 'WORKING' && additionalItems?.length > 0) {
-      // Hapus dulu item tambahan lama (jika admin sempat mengedit) agar tidak duplikat
+      // Validasi item tambahan
+      for (const item of additionalItems) {
+        if (!item.name?.trim() || Number(item.price) < 0 || Number(item.qty) <= 0) {
+          return res.status(400).json({ error: 'Data item tambahan tidak valid.' });
+        }
+      }
+
       await prisma.orderItem.deleteMany({
         where: { orderId: id, isAdditional: true }
       });
       
-      // Buat item tambahan yang baru
       await prisma.orderItem.createMany({
         data: additionalItems.map((item: any) => ({
           orderId: id,
           type: item.type,
-          name: item.name,
-          price: item.price,
-          qty: item.qty,
+          name: item.name.trim(),
+          price: Number(item.price) || 0,
+          qty: Number(item.qty) || 1,
           sparepartId: item.sparepartId || null,
           isAdditional: true
         }))
       });
     }
 
-    // 3. UPDATE STATUS
     const updatedOrder = await prisma.order.update({ 
       where: { id }, 
       data: { status: newStatus },
@@ -287,12 +356,10 @@ app.put('/api/orders/:id/status', requireAuth, async (req, res) => {
 });
 
 // ==========================================
-// 7. ENDPOINT TRACKING (PUBLIK - BERDASARKAN TOKEN)
+// 7. ENDPOINT TRACKING (PUBLIK)
 // ==========================================
 app.get('/api/tracking/:token', async (req, res) => {
-  // FIX TYPESCRIPT: Tambahkan 'as string'
   const token = req.params.token as string;
-  
   const order = await prisma.order.findUnique({
     where: { trackingToken: token },
     include: { items: true, mechanic: true }
@@ -304,23 +371,24 @@ app.get('/api/tracking/:token', async (req, res) => {
 
 app.put('/api/tracking/:token/approve', async (req, res) => {
   try {
-    // FIX TYPESCRIPT: Tambahkan 'as string'
     const token = req.params.token as string;
-    const { accepted } = req.body; // boolean
+    const { accepted } = req.body;
+
+    if (typeof accepted !== 'boolean') {
+      return res.status(400).json({ error: 'Parameter accepted harus boolean (true/false).' });
+    }
 
     const order = await prisma.order.findUnique({ where: { trackingToken: token } });
     if (!order || order.status !== 'APPROVAL') {
       return res.status(400).json({ error: 'Pesanan tidak dalam status menunggu konfirmasi.' });
     }
 
-    // Jika pelanggan menolak, hapus semua item tambahan
     if (!accepted) {
       await prisma.orderItem.deleteMany({
         where: { orderId: order.id, isAdditional: true }
       });
     }
 
-    // Kembalikan ke WORKING (lanjut servis dengan/tanpa tambahan)
     const updatedOrder = await prisma.order.update({
       where: { id: order.id },
       data: { status: 'WORKING' }
@@ -338,25 +406,21 @@ app.put('/api/tracking/:token/approve', async (req, res) => {
 app.post('/api/checkout', requireAuth, async (req, res) => {
   try {
     const { orderId, mode, lines } = req.body; 
-    // mode: 'service' atau 'parts'
-    // lines: array berisi { id, type, qty, price } dari frontend
+    
+    // VALIDASI INPUT
+    if (!lines || lines.length === 0) {
+      return res.status(400).json({ error: 'Rincian pembayaran tidak boleh kosong.' });
+    }
 
-    // 1. Hitung nominal
     const serviceAmount = lines.filter((l: any) => l.type === 'JASA').reduce((sum: number, l: any) => sum + (l.price * l.qty), 0);
     const partsAmount = lines.filter((l: any) => l.type === 'SPAREPART').reduce((sum: number, l: any) => sum + (l.price * l.qty), 0);
     const total = serviceAmount + partsAmount;
 
-    // 2. Dapatkan data order (untuk mekanik)
     const order = orderId ? await prisma.order.findUnique({ where: { id: orderId } }) : null;
     const mechanicId = order?.mechanicId || undefined;
-
-    // 3. Hitung komisi sesuai database
     const commission = await calculateCommission(mechanicId, serviceAmount, partsAmount);
 
-    // 4. JALANKAN TRANSAKSI ACID (Semua sukses, atau semua batal)
     const result = await prisma.$transaction(async (tx) => {
-      
-      // 4a. Validasi & Potong Stok
       for (const line of lines) {
         if (line.type === 'SPAREPART' && line.id) {
           const part = await tx.sparepart.findUnique({ where: { id: line.id } });
@@ -370,7 +434,6 @@ app.post('/api/checkout', requireAuth, async (req, res) => {
         }
       }
 
-      // 4b. Simpan Transaksi
       const newTx = await tx.transaction.create({
         data: {
           orderId: order?.id,
@@ -384,7 +447,6 @@ app.post('/api/checkout', requireAuth, async (req, res) => {
         }
       });
 
-      // 4c. Hapus Order dari Kanban (jika ini pesanan servis)
       if (mode === 'service' && orderId) {
         await tx.order.delete({ where: { id: orderId } });
       }
@@ -395,7 +457,6 @@ app.post('/api/checkout', requireAuth, async (req, res) => {
     res.json({ success: true, transaction: result });
   } catch (error: any) {
     console.error('Checkout Error:', error);
-    // Jika error dilempar dari dalam transaksi (misal stok kurang)
     res.status(400).json({ error: error.message || 'Gagal memproses pembayaran' });
   }
 });
@@ -425,31 +486,41 @@ app.get('/api/commission', requireAuth, async (req, res) => {
 });
 
 app.put('/api/commission', requireAuth, async (req, res) => {
-  const { servicePercent, partsPercent, overrides } = req.body;
-  
-  await prisma.$transaction(async (tx) => {
-    await tx.commissionSetting.upsert({
-      where: { id: 'global' },
-      update: { servicePercent, partsPercent },
-      create: { id: 'global', servicePercent, partsPercent }
-    });
+  try {
+    const { servicePercent, partsPercent, overrides } = req.body;
     
-    await tx.commissionOverride.deleteMany({});
-    
-    if (overrides) {
-      for (const [mechanicId, raw] of Object.entries(overrides)) {
-        const v = raw as any;
-        if (v.service === undefined && v.parts === undefined) continue;
-        await tx.commissionOverride.create({
-          data: { mechanicId, servicePercent: v.service ?? null, partsPercent: v.parts ?? null }
-        });
-      }
+    // VALIDASI INPUT KOMISI
+    if (Number(servicePercent) < 0 || Number(servicePercent) > 100 || Number(partsPercent) < 0 || Number(partsPercent) > 100) {
+      return res.status(400).json({ error: 'Persentase komisi harus di antara 0 dan 100.' });
     }
-  });
 
-  res.json({ success: true });
+    await prisma.$transaction(async (tx) => {
+      await tx.commissionSetting.upsert({
+        where: { id: 'global' },
+        update: { servicePercent: Number(servicePercent), partsPercent: Number(partsPercent) },
+        create: { id: 'global', servicePercent: Number(servicePercent), partsPercent: Number(partsPercent) }
+      });
+      
+      await tx.commissionOverride.deleteMany({});
+      
+      if (overrides) {
+        for (const [mechanicId, raw] of Object.entries(overrides)) {
+          const v = raw as any;
+          if (v.service === undefined && v.parts === undefined) continue;
+          await tx.commissionOverride.create({
+            data: { mechanicId, servicePercent: v.service ?? null, partsPercent: v.parts ?? null }
+          });
+        }
+      }
+    });
+
+    res.json({ success: true });
+  } catch (error) {
+    res.status(500).json({ error: 'Gagal menyimpan aturan komisi.' });
+  }
 });
 
+// GLOBAL ERROR HANDLER
 app.use((err: any, req: express.Request, res: express.Response, next: express.NextFunction) => {
   console.error('Unhandled Error:', err);
   res.status(500).json({ error: 'Terjadi kesalahan internal pada server.' });
