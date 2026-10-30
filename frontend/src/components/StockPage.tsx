@@ -1,7 +1,7 @@
 import { useMemo, useState } from 'react';
-import { AlertTriangle, Check, Edit3, Package, Plus, Search, X } from 'lucide-react';
-import type { Sparepart } from '../data';
-import { fetchApi } from '../api'; // <-- Import fetchApi
+import { AlertTriangle, Check, Edit3, Package, Plus, Search, X, Wrench, Trash2 } from 'lucide-react';
+import type { Sparepart, Service } from '../data';
+import { fetchApi } from '../api';
 
 type StockStatus = 'aman' | 'menipis' | 'habis';
 
@@ -32,29 +32,35 @@ export function getStockAlerts(parts: Sparepart[]) {
     });
 }
 
-type PartPayload = {
-  name: string;
-  code: string;
-  category: string;
-  price: number;
-  stock: number;
-  minStock: number;
-};
+type PartPayload = { name: string; code: string; category: string; price: number; stock: number; minStock: number; };
+type ServicePayload = { name: string; price: number; };
 
 export default function StockPage({
   parts,
   setParts,
+  services,
+  refreshData,
   showToast,
 }: {
   parts: Sparepart[];
   setParts: React.Dispatch<React.SetStateAction<Sparepart[]>>;
+  services: Service[];
+  refreshData: () => void;
   showToast: (message: string) => void;
 }) {
+  const [activeTab, setActiveTab] = useState<'sparepart' | 'service'>('sparepart');
+
+  // === STATE SPAREPART ===
   const [search, setSearch] = useState('');
   const [filter, setFilter] = useState<'all' | 'menipis' | 'habis'>('all');
   const [editingPart, setEditingPart] = useState<Sparepart | null>(null);
   const [showPartModal, setShowPartModal] = useState(false);
   const [restockPart, setRestockPart] = useState<Sparepart | null>(null);
+
+  // === STATE SERVICE ===
+  const [showServiceModal, setShowServiceModal] = useState(false);
+  const [editingService, setEditingService] = useState<Service | null>(null);
+
   const [saving, setSaving] = useState(false);
 
   const alerts = useMemo(() => getStockAlerts(parts), [parts]);
@@ -76,7 +82,7 @@ export default function StockPage({
 
   const refreshParts = async () => {
     try {
-      const res = await fetchApi('/api/spareparts'); // <-- Pakai fetchApi
+      const res = await fetchApi('/api/spareparts');
       if (res.ok) {
         const data = (await res.json()) as Sparepart[];
         setParts(data);
@@ -84,30 +90,14 @@ export default function StockPage({
     } catch {}
   };
 
-  const openAddPart = () => {
-    setEditingPart(null);
-    setShowPartModal(true);
-  };
-
-  const openEditPart = (part: Sparepart) => {
-    setEditingPart(part);
-    setShowPartModal(true);
-  };
-
   const savePart = async (data: PartPayload) => {
     setSaving(true);
     try {
       let res;
       if (editingPart) {
-        res = await fetchApi(`/api/spareparts/${editingPart.id}`, { // <-- Pakai fetchApi
-          method: 'PUT',
-          body: JSON.stringify(data),
-        });
+        res = await fetchApi(`/api/spareparts/${editingPart.id}`, { method: 'PUT', body: JSON.stringify(data) });
       } else {
-        res = await fetchApi('/api/spareparts', { // <-- Pakai fetchApi
-          method: 'POST',
-          body: JSON.stringify(data),
-        });
+        res = await fetchApi('/api/spareparts', { method: 'POST', body: JSON.stringify(data) });
       }
       
       const json = await res.json().catch(() => ({}));
@@ -129,10 +119,7 @@ export default function StockPage({
   const addStock = async (part: Sparepart, qty: number, note: string) => {
     setSaving(true);
     try {
-      const res = await fetchApi(`/api/spareparts/${part.id}/restock`, { // <-- Pakai fetchApi
-        method: 'POST',
-        body: JSON.stringify({ qty, note }),
-      });
+      const res = await fetchApi(`/api/spareparts/${part.id}/restock`, { method: 'POST', body: JSON.stringify({ qty, note }) });
       const json = await res.json().catch(() => ({}));
       if (!res.ok) {
         showToast(json.error || 'Gagal menambah stok');
@@ -146,6 +133,44 @@ export default function StockPage({
     } finally {
       setSaving(false);
     }
+  };
+
+  // === SIMPAN SERVICE ===
+  const saveService = async (data: ServicePayload) => {
+    setSaving(true);
+    try {
+      let res;
+      if (editingService) {
+        res = await fetchApi(`/api/services/${editingService.id}`, { method: 'PUT', body: JSON.stringify(data) });
+      } else {
+        res = await fetchApi('/api/services', { method: 'POST', body: JSON.stringify(data) });
+      }
+      
+      const json = await res.json().catch(() => ({}));
+      if (!res.ok) {
+        showToast(json.error || 'Gagal menyimpan servis');
+        return;
+      }
+      
+      showToast(editingService ? 'Data servis diperbarui' : 'Servis baru ditambahkan');
+      await refreshData(); // Refresh state global di App.tsx
+      setShowServiceModal(false);
+    } catch {
+      showToast('Tidak dapat terhubung ke server');
+    } finally {
+      setSaving(false);
+    }
+  };
+
+  const deleteService = async (id: string) => {
+    if (!confirm('Hapus katalog servis ini?')) return;
+    try {
+      const res = await fetchApi(`/api/services/${id}`, { method: 'DELETE' });
+      if (res.ok) {
+        showToast('Servis dihapus');
+        refreshData();
+      }
+    } catch {}
   };
 
   const filterToLow = () => {
@@ -163,72 +188,114 @@ export default function StockPage({
     <div className="stock-page">
       <div className="stock-heading">
         <div>
-          <div className="eyebrow"><span className="live-dot" /> INVENTARIS SPAREPART</div>
-          <h1>Stok Sparepart</h1>
-          <p>Kelola ketersediaan suku cadang bengkel.</p>
+          <div className="eyebrow"><span className="live-dot" /> INVENTARIS & LAYANAN</div>
+          <h1>Stok & Katalog</h1>
+          <p>Kelola ketersediaan suku cadang dan daftar harga jasa.</p>
         </div>
       </div>
 
-      {alerts.length > 0 && (
-        <div className="stock-alert-banner fade-in">
-          <AlertTriangle size={20} />
-          <div className="stock-alert-copy">
-            <strong>{lowCount} sparepart stok menipis{outCount > 0 ? `, ${outCount} habis` : ''}</strong>
-            <span>Lengkapi stok sebelum mengganggu layanan servis.</span>
-          </div>
-          <button className="secondary-button stock-alert-action" onClick={filterToLow}>Lihat yang menipis</button>
-        </div>
-      )}
-
-      <div className="stock-toolbar">
-        <div className="stock-search">
-          <Search size={18} />
-          <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari kode atau nama sparepart…" />
-        </div>
-        <div className="stock-filter-chips" role="group" aria-label="Filter stok">
-          {filters.map((f) => (
-            <button key={f.id} className={`stock-filter-chip ${filter === f.id ? 'selected' : ''}`} onClick={() => setFilter(f.id)}>
-              {f.label}
-            </button>
-          ))}
-        </div>
-        <button className="primary-button stock-add-btn" onClick={openAddPart}>
-          <Plus size={16} /> Tambah Sparepart
+      {/* TABS NAVIGASI */}
+      <div className="settings-tabs" style={{ marginBottom: '20px' }}>
+        <button className={`settings-tab ${activeTab === 'sparepart' ? 'active' : ''}`} onClick={() => setActiveTab('sparepart')}>
+          <Package size={16} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'text-bottom' }}/> Stok Sparepart
+        </button>
+        <button className={`settings-tab ${activeTab === 'service' ? 'active' : ''}`} onClick={() => setActiveTab('service')}>
+          <Wrench size={16} style={{ display: 'inline', marginRight: '6px', verticalAlign: 'text-bottom' }}/> Katalog Servis
         </button>
       </div>
 
-      <div className="stock-table-card">
-        <div className="stock-table">
-          <div className="stock-table-head">
-            <span>Kode</span><span>Nama</span><span>Kategori</span><span>Stok</span>
-            <span className="right">Min. Stok</span><span className="right">Harga Jual</span><span className="right">Aksi</span>
-          </div>
-          {filteredParts.length === 0 ? (
-            <div className="stock-empty-row"><Package size={22} /><span>Tidak ada sparepart yang cocok.</span></div>
-          ) : filteredParts.map((part) => {
-            const status = getStockStatus(part);
-            return (
-              <div key={part.id} className={`stock-table-row ${status === 'menipis' ? 'low-stock' : ''} ${status === 'habis' ? 'out-stock' : ''}`}>
-                <span className="stock-code">{part.code}</span>
-                <span className="stock-name">{part.name}</span>
-                <span className="stock-category">{part.category}</span>
-                <span className="stock-qty-cell">
-                  <strong className="tabular-nums">{part.stock}</strong>
-                  <span className={`stock-badge ${status}`}>
-                    {status === 'aman' ? 'Aman' : status === 'menipis' ? 'Menipis' : 'Habis'}
-                  </span>
-                </span>
-                <span className="right tabular-nums">{part.minStock}</span>
-                <span className="right tabular-nums">{formatRupiah(part.price)}</span>
-                <span className="right stock-row-actions">
-                  <button className="stock-action-btn edit" onClick={() => openEditPart(part)}><Edit3 size={14} /> Edit</button>
-                  <button className="stock-action-btn restock" onClick={() => setRestockPart(part)}><Plus size={14} /> Stok</button>
-                </span>
+      {activeTab === 'sparepart' ? (
+        <>
+          {alerts.length > 0 && (
+            <div className="stock-alert-banner fade-in">
+              <AlertTriangle size={20} />
+              <div className="stock-alert-copy">
+                <strong>{lowCount} sparepart stok menipis{outCount > 0 ? `, ${outCount} habis` : ''}</strong>
+                <span>Lengkapi stok sebelum mengganggu layanan servis.</span>
               </div>
-            );
-          })}
-        </div>
-      </div>
+              <button className="secondary-button stock-alert-action" onClick={filterToLow}>Lihat yang menipis</button>
+            </div>
+          )}
+
+          <div className="stock-toolbar">
+            <div className="stock-search">
+              <Search size={18} />
+              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari kode atau nama sparepart…" />
+            </div>
+            <div className="stock-filter-chips" role="group" aria-label="Filter stok">
+              {filters.map((f) => (
+                <button key={f.id} className={`stock-filter-chip ${filter === f.id ? 'selected' : ''}`} onClick={() => setFilter(f.id)}>
+                  {f.label}
+                </button>
+              ))}
+            </div>
+            <button className="primary-button stock-add-btn" onClick={() => { setEditingPart(null); setShowPartModal(true); }}>
+              <Plus size={16} /> Tambah Sparepart
+            </button>
+          </div>
+
+          <div className="stock-table-card">
+            <div className="stock-table">
+              <div className="stock-table-head">
+                <span>Kode</span><span>Nama</span><span>Kategori</span><span>Stok</span>
+                <span className="right">Min. Stok</span><span className="right">Harga Jual</span><span className="right">Aksi</span>
+              </div>
+              {filteredParts.length === 0 ? (
+                <div className="stock-empty-row"><Package size={22} /><span>Tidak ada sparepart yang cocok.</span></div>
+              ) : filteredParts.map((part) => {
+                const status = getStockStatus(part);
+                return (
+                  <div key={part.id} className={`stock-table-row ${status === 'menipis' ? 'low-stock' : ''} ${status === 'habis' ? 'out-stock' : ''}`}>
+                    <span className="stock-code">{part.code}</span>
+                    <span className="stock-name">{part.name}</span>
+                    <span className="stock-category">{part.category}</span>
+                    <span className="stock-qty-cell">
+                      <strong className="tabular-nums">{part.stock}</strong>
+                      <span className={`stock-badge ${status}`}>{status === 'aman' ? 'Aman' : status === 'menipis' ? 'Menipis' : 'Habis'}</span>
+                    </span>
+                    <span className="right tabular-nums">{part.minStock}</span>
+                    <span className="right tabular-nums">{formatRupiah(part.price)}</span>
+                    <span className="right stock-row-actions">
+                      <button className="stock-action-btn edit" onClick={() => { setEditingPart(part); setShowPartModal(true); }}><Edit3 size={14} /> Edit</button>
+                      <button className="stock-action-btn restock" onClick={() => setRestockPart(part)}><Plus size={14} /> Stok</button>
+                    </span>
+                  </div>
+                );
+              })}
+            </div>
+          </div>
+        </>
+      ) : (
+        <>
+          <div className="stock-toolbar">
+            <div style={{ flex: 1 }} />
+            <button className="primary-button stock-add-btn" onClick={() => { setEditingService(null); setShowServiceModal(true); }}>
+              <Plus size={16} /> Tambah Servis
+            </button>
+          </div>
+
+          <div className="stock-table-card">
+            <div className="stock-table">
+              {/* Override Grid Template khusus untuk tabel servis */}
+              <div className="stock-table-head" style={{ gridTemplateColumns: 'minmax(200px, 1fr) 150px 120px' }}>
+                <span>Nama Layanan / Jasa</span><span className="right">Harga Jasa</span><span className="right">Aksi</span>
+              </div>
+              {services.length === 0 ? (
+                <div className="stock-empty-row"><Wrench size={22} /><span>Belum ada katalog servis.</span></div>
+              ) : services.map((service) => (
+                <div key={service.id} className="stock-table-row" style={{ gridTemplateColumns: 'minmax(200px, 1fr) 150px 120px' }}>
+                  <span className="stock-name" style={{ fontWeight: 600 }}>{service.name}</span>
+                  <span className="right tabular-nums">{formatRupiah(service.price)}</span>
+                  <span className="right stock-row-actions">
+                    <button className="stock-action-btn edit" onClick={() => { setEditingService(service); setShowServiceModal(true); }}><Edit3 size={14} /> Edit</button>
+                    <button className="stock-action-btn" style={{ color: 'var(--danger)' }} onClick={() => deleteService(service.id)}><Trash2 size={14} /></button>
+                  </span>
+                </div>
+              ))}
+            </div>
+          </div>
+        </>
+      )}
 
       {showPartModal && (
         <PartModal part={editingPart} newCode={nextPartCode(parts)} categories={categories} saving={saving} onClose={() => setShowPartModal(false)} onSave={savePart} />
@@ -236,10 +303,51 @@ export default function StockPage({
       {restockPart && (
         <RestockModal part={restockPart} saving={saving} onClose={() => setRestockPart(null)} onSave={addStock} />
       )}
+      {showServiceModal && (
+        <ServiceModal service={editingService} saving={saving} onClose={() => setShowServiceModal(false)} onSave={saveService} />
+      )}
     </div>
   );
 }
 
+// =========================================================
+// MODAL: SERVICE (TAMBAH / EDIT KATALOG JASA)
+// =========================================================
+function ServiceModal({ service, saving, onClose, onSave }: { service: Service | null; saving: boolean; onClose: () => void; onSave: (data: ServicePayload) => void; }) {
+  const [name, setName] = useState(service?.name || '');
+  const [price, setPrice] = useState(String(service?.price ?? ''));
+
+  const canSave = !saving && name.trim().length > 0 && price !== '';
+
+  return (
+    <div className="modal-backdrop" onClick={onClose}>
+      <section className="settings-modal stock-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="modal-heading">
+          <div><span className="drawer-eyebrow">{service ? 'EDIT SERVIS' : 'TAMBAH SERVIS'}</span><h2>{service ? 'Edit Servis' : 'Tambah Servis'}</h2></div>
+          <button className="close-button" onClick={onClose}><X size={20} /></button>
+        </div>
+        <div className="settings-modal-body" style={{ display: 'flex', flexDirection: 'column' }}>
+          <label className="settings-form-field">
+            <span>Nama Layanan / Jasa *</span>
+            <input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Contoh: Servis CVT" />
+          </label>
+          <label className="settings-form-field">
+            <span>Harga Jasa (Rp) *</span>
+            <input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9]/g, ''))} placeholder="0" inputMode="numeric" />
+          </label>
+        </div>
+        <div className="dialog-footer">
+          <button className="secondary-button" onClick={onClose} disabled={saving}>Batal</button>
+          <button className="primary-button" disabled={!canSave} onClick={() => onSave({ name: name.trim(), price: Number(price) || 0 })}><Check size={16} /> {saving ? 'Menyimpan…' : 'Simpan'}</button>
+        </div>
+      </section>
+    </div>
+  );
+}
+
+// =========================================================
+// MODAL: TAMBAH / EDIT SPAREPART
+// =========================================================
 function PartModal({ part, newCode, categories, saving, onClose, onSave }: { part: Sparepart | null; newCode: string; categories: string[]; saving: boolean; onClose: () => void; onSave: (data: PartPayload) => void; }) {
   const [name, setName] = useState(part?.name || '');
   const [code, setCode] = useState(part?.code || newCode);
@@ -279,6 +387,9 @@ function PartModal({ part, newCode, categories, saving, onClose, onSave }: { par
   );
 }
 
+// =========================================================
+// MODAL: RESTOCK (TAMBAH STOK CEPAT)
+// =========================================================
 function RestockModal({ part, saving, onClose, onSave }: { part: Sparepart; saving: boolean; onClose: () => void; onSave: (part: Sparepart, qty: number, note: string) => void; }) {
   const [qty, setQty] = useState('');
   const [note, setNote] = useState('');

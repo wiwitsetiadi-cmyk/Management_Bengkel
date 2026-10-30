@@ -1,7 +1,7 @@
 import type { ReactNode } from 'react';
 import { X, Wrench, ShoppingCart, FileText, ChevronDown, Search, Minus, Plus, Trash2, Printer, ChevronRight } from 'lucide-react';
 import { formatRupiah } from '../data';
-import type { CartItem, OrderMode, Sparepart, Mechanic } from '../data';
+import type { CartItem, OrderMode, Sparepart, Mechanic, Service } from '../data';
 
 function Field({ label, hint, required, error, errorText, children }: { label: string; hint?: string; required?: boolean; error?: boolean; errorText?: string; children: ReactNode }) {
   return (
@@ -22,6 +22,7 @@ export type NewOrderDialogProps = {
   cart: CartItem[];
   cartTotal: number;
   mechanics: Mechanic[];
+  services: Service[]; // <-- PROP BARU
   onClose: () => void;
   onModeChange: (mode: OrderMode) => void;
   onFieldChange: (field: keyof NewOrderDialogProps['serviceForm'], value: string) => void;
@@ -34,7 +35,27 @@ export type NewOrderDialogProps = {
   onOpenCashier: () => void;
 };
 
-export default function NewOrderDialog({ mode, serviceForm, mechanicError, partSearch, filteredParts, cart, cartTotal, mechanics, onClose, onModeChange, onFieldChange, onMechanicBlur, onPartSearch, onAddPart, onChangeQty, onRemovePart, onSaveService, onOpenCashier }: NewOrderDialogProps) {
+export default function NewOrderDialog({ 
+  mode, 
+  serviceForm, 
+  mechanicError, 
+  partSearch, 
+  filteredParts, 
+  cart, 
+  cartTotal, 
+  mechanics, 
+  services, // <-- TERIMA PROP BARU
+  onClose, 
+  onModeChange, 
+  onFieldChange, 
+  onMechanicBlur, 
+  onPartSearch, 
+  onAddPart, 
+  onChangeQty, 
+  onRemovePart, 
+  onSaveService, 
+  onOpenCashier 
+}: NewOrderDialogProps) {
   const submitParts = () => onOpenCashier();
   const activeMechanics = mechanics.filter(m => m.isActive);
 
@@ -69,16 +90,12 @@ export default function NewOrderDialog({ mode, serviceForm, mechanicError, partS
               <div className="select-wrap">
                 <select value={serviceForm.serviceType} onChange={(event) => onFieldChange('serviceType', event.target.value)}>
                   <option value="">Pilih jenis servis</option>
-                  <option value="servis-ringan">Servis Ringan / Tune Up (Rp 50.000)</option>
-                  <option value="ganti-oli">Ganti Oli Mesin (Rp 15.000)</option>
-                  <option value="servis-cvt">Servis CVT - Matic (Rp 60.000)</option>
-                  <option value="ganti-kampas-rem">Ganti Kampas Rem (Rp 25.000)</option>
-                  <option value="servis-injeksi">Pembersihan / Jasa Injeksi (Rp 50.000)</option>
-                  <option value="ganti-ban">Ganti Ban Luar (Rp 25.000)</option>
-                  <option value="ganti-rantai">Ganti Gear Set & Rantai (Rp 35.000)</option>
-                  <option value="kuras-tangki">Kuras Tangki Bensin (Rp 40.000)</option>
-                  <option value="ganti-oli-shock">Ganti Oli Shockbreaker (Rp 50.000)</option>
-                  <option value="servis-besar">Servis Besar / Turun Mesin (Rp 250.000)</option>
+                  {/* PERBAIKAN: Looping data servis dari database */}
+                  {services.map((service) => (
+                    <option key={service.id} value={service.id}>
+                      {service.name} ({formatRupiah(service.price)})
+                    </option>
+                  ))}
                 </select>
                 <ChevronDown size={17} />
               </div>

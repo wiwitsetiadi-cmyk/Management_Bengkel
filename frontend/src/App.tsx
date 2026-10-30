@@ -21,7 +21,7 @@ import {
 } from 'lucide-react';
 
 import { allowedTransitions, columns } from './data';
-import type { Mechanic, Sparepart, Order, Transaction, CartItem, CashierSelection, CashierLine, OrderMode, OrderStatus } from './data';
+import type { Mechanic, Sparepart, Service, Order, Transaction, CartItem, CashierSelection, CashierLine, OrderMode, OrderStatus } from './data';
 import { fetchApi } from './api';
 
 const navItems = [
@@ -44,6 +44,7 @@ function App() {
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [parts, setParts] = useState<Sparepart[]>([]);
+  const [services, setServices] = useState<Service[]>([]); // <-- State Baru
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [mechanics, setMechanics] = useState<Mechanic[]>([]);
 
@@ -89,16 +90,18 @@ function App() {
 
   const fetchData = async () => {
     try {
-      const [resOrders, resParts, resTransactions, resMechanics] = await Promise.all([
+      const [resOrders, resParts, resTransactions, resMechanics, resServices] = await Promise.all([
         fetchApi('/api/orders'),
         fetchApi('/api/spareparts'),
         fetchApi('/api/transactions'),
-        fetchApi('/api/mechanics')
+        fetchApi('/api/mechanics'),
+        fetchApi('/api/services') // <-- Fetch Katalog Servis
       ]);
       setOrders(await resOrders.json());
       setParts(await resParts.json());
       setTransactions(await resTransactions.json());
       setMechanics(await resMechanics.json());
+      setServices(await resServices.json()); // <-- Set State Services
     } catch (error) {
       console.error(error);
       showToast('Gagal terhubung ke database server');
@@ -229,24 +232,11 @@ function App() {
       return;
     }
     const mechanic = mechanics.find((item) => item.id === serviceForm.mechanicId);
-    if (!mechanic || !serviceForm.vehicle.trim() || !serviceForm.serviceType) return;
-
-    // KAMUS HARGA SERVIS (Fixed Price / Harga Pasti)
-    const serviceCatalog: Record<string, { name: string; price: number }> = {
-      'servis-ringan': { name: 'Servis Ringan / Tune Up', price: 50000 },
-      'ganti-oli': { name: 'Ganti Oli Mesin (Jasa)', price: 15000 },
-      'servis-cvt': { name: 'Servis CVT (Matic)', price: 60000 },
-      'ganti-kampas-rem': { name: 'Ganti Kampas Rem (Jasa)', price: 25000 },
-      'servis-injeksi': { name: 'Pembersihan / Jasa Injeksi', price: 50000 },
-      'ganti-ban': { name: 'Ganti Ban Luar (Jasa)', price: 25000 },
-      'ganti-rantai': { name: 'Ganti Gear Set & Rantai (Jasa)', price: 35000 },
-      'kuras-tangki': { name: 'Kuras Tangki Bensin', price: 40000 },
-      'ganti-oli-shock': { name: 'Ganti Oli Shockbreaker (Jasa)', price: 50000 },
-      'servis-besar': { name: 'Servis Besar (Turun Mesin)', price: 250000 },
-    };
-
-    const selectedService = serviceCatalog[serviceForm.serviceType];
-    if (!selectedService) return;
+    
+    // PERBAIKAN: Cari servis dari database berdasarkan ID yang dipilih
+    const selectedService = services.find((s) => s.id === serviceForm.serviceType);
+    
+    if (!mechanic || !serviceForm.vehicle.trim() || !selectedService) return;
 
     const newOrderPayload = {
       vehicle: serviceForm.vehicle.trim(),
@@ -365,7 +355,7 @@ function App() {
           <div className="brand-mark"><Wrench size={18} strokeWidth={2.4} /></div>
           <span className="brand-name">BENGKEL</span>
           <span className="topbar-divider" />
-          <span className="page-label">{activeView === 'cashier' ? 'Kasir' : activeView === 'settings' ? 'Pengaturan' : activeView === 'reports' ? 'Laporan' : activeView === 'stock' ? 'Stok Sparepart' : 'Dasbor Operasional'}</span>
+          <span className="page-label">{activeView === 'cashier' ? 'Kasir' : activeView === 'settings' ? 'Pengaturan' : activeView === 'reports' ? 'Laporan' : activeView === 'stock' ? 'Stok & Katalog' : 'Dasbor Operasional'}</span>
         </div>
         <div className="global-search">
           <Search size={19} />
@@ -406,7 +396,7 @@ function App() {
           ) : activeView === 'reports' ? (
             <ReportsPage transactions={transactions} showToast={showToast} />
           ) : activeView === 'stock' ? (
-            <StockPage parts={parts} setParts={setParts} showToast={showToast} />
+            <StockPage parts={parts} setParts={setParts} services={services} refreshData={fetchData} showToast={showToast} />
           ) : (
           <>
           <div className="page-heading">
@@ -437,7 +427,7 @@ function App() {
       </div>
 
       {selectedOrder && <OrderDrawer order={selectedOrder} parts={parts} onClose={() => setSelectedOrder(null)} onStatusChange={updateSelectedStatus} />}
-      {orderDialogOpen && <NewOrderDialog mode={orderMode} serviceForm={serviceForm} mechanicError={mechanicError} partSearch={partSearch} filteredParts={filteredParts} cart={cart} cartTotal={cartTotal} mechanics={mechanics} onClose={() => setOrderDialogOpen(false)} onModeChange={setOrderMode} onFieldChange={updateServiceField} onMechanicBlur={() => setMechanicError(!serviceForm.mechanicId)} onPartSearch={setPartSearch} onAddPart={addPart} onChangeQty={changeQty} onRemovePart={removePart} onSaveService={saveServiceOrder} onOpenCashier={openCashier} />}
+      {orderDialogOpen && <NewOrderDialog mode={orderMode} serviceForm={serviceForm} mechanicError={mechanicError} partSearch={partSearch} filteredParts={filteredParts} cart={cart} cartTotal={cartTotal} mechanics={mechanics} services={services} onClose={() => setOrderDialogOpen(false)} onModeChange={setOrderMode} onFieldChange={updateServiceField} onMechanicBlur={() => setMechanicError(!serviceForm.mechanicId)} onPartSearch={setPartSearch} onAddPart={addPart} onChangeQty={changeQty} onRemovePart={removePart} onSaveService={saveServiceOrder} onOpenCashier={openCashier} />}
       {ticketPreview && <TicketPreview order={ticketPreview} onClose={() => setTicketPreview(null)} />}
       {finalReceipt && <FinalReceipt selection={finalReceipt} onClose={() => setFinalReceipt(null)} onNewTransaction={() => { setFinalReceipt(null); navigateView('cashier'); setCashierSelection(null); }} />}
       {toast && <div className="toast"><span className="toast-check"><Check size={15} /></span>{toast}<button onClick={() => setToast(null)}><X size={15} /></button></div>}
