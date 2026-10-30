@@ -51,6 +51,23 @@ async function main() {
     }
   });
 
+  // 4. Buat Katalog Servis
+  await prisma.service.createMany({
+    data: [
+      { name: 'Servis Ringan / Tune Up', price: 50000 },
+      { name: 'Ganti Oli Mesin (Jasa)', price: 15000 },
+      { name: 'Servis CVT (Matic)', price: 60000 },
+      { name: 'Ganti Kampas Rem (Jasa)', price: 25000 },
+      { name: 'Pembersihan / Jasa Injeksi', price: 50000 },
+      { name: 'Ganti Ban Luar (Jasa)', price: 25000 },
+      { name: 'Ganti Gear Set & Rantai (Jasa)', price: 35000 },
+      { name: 'Kuras Tangki Bensin', price: 40000 },
+      { name: 'Ganti Oli Shockbreaker (Jasa)', price: 50000 },
+      { name: 'Servis Besar (Turun Mesin)', price: 250000 },
+    ],
+    skipDuplicates: true,
+  });
+  
   console.log('✅ Data Master Mekanik, Sparepart, dan Order berhasil dimasukkan!');
 }
 
