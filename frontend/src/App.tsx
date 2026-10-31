@@ -44,7 +44,7 @@ function App() {
 
   const [orders, setOrders] = useState<Order[]>([]);
   const [parts, setParts] = useState<Sparepart[]>([]);
-  const [services, setServices] = useState<Service[]>([]); // <-- State Baru
+  const [services, setServices] = useState<Service[]>([]);
   const [transactions, setTransactions] = useState<Transaction[]>([]);
   const [mechanics, setMechanics] = useState<Mechanic[]>([]);
 
@@ -88,6 +88,7 @@ function App() {
     setAuthUser(null);
   };
 
+  // fetchData TETAP DIGUNAKAN UNTUK PERTAMA KALI LOAD / RELOAD
   const fetchData = async () => {
     try {
       const [resOrders, resParts, resTransactions, resMechanics, resServices] = await Promise.all([
@@ -95,13 +96,13 @@ function App() {
         fetchApi('/api/spareparts'),
         fetchApi('/api/transactions'),
         fetchApi('/api/mechanics'),
-        fetchApi('/api/services') // <-- Fetch Katalog Servis
+        fetchApi('/api/services')
       ]);
       setOrders(await resOrders.json());
       setParts(await resParts.json());
       setTransactions(await resTransactions.json());
       setMechanics(await resMechanics.json());
-      setServices(await resServices.json()); // <-- Set State Services
+      setServices(await resServices.json());
     } catch (error) {
       console.error(error);
       showToast('Gagal terhubung ke database server');
@@ -148,6 +149,8 @@ function App() {
     const order = orders.find((item) => item.id === orderId);
     if (!order || order.status === status || !allowedTransitions[order.status].includes(status)) return;
     
+    const prevOrders = [...orders];
+    // Optimistic Update
     setOrders((current) => current.map((item) => (item.id === orderId ? { ...item, status } : item)));
     setDropTarget(null);
     
@@ -159,11 +162,13 @@ function App() {
       if (!res.ok) {
         const data = await res.json();
         showToast(data.error || 'Gagal update status');
+        setOrders(prevOrders); // Rollback jika gagal
       }
-      fetchData();
+      // fetchData() DIHAPUS
     } catch (error) {
       console.error(error);
       showToast('Gagal update ke database');
+      setOrders(prevOrders); // Rollback jika error koneksi
     }
   };
 
@@ -188,7 +193,8 @@ function App() {
       }
 
       setSelectedOrder(null);
-      fetchData();
+      // Update state lokal dengan data baru dari backend (termasuk items tambahan)
+      setOrders((current) => current.map((o) => (o.id === selectedOrder.id ? data : o)));
     } catch (error) {
       console.error(error);
       showToast('Gagal menyimpan perubahan ke database');
@@ -232,8 +238,6 @@ function App() {
       return;
     }
     const mechanic = mechanics.find((item) => item.id === serviceForm.mechanicId);
-    
-    // PERBAIKAN: Cari servis dari database berdasarkan ID yang dipilih
     const selectedService = services.find((s) => s.id === serviceForm.serviceType);
     
     if (!mechanic || !serviceForm.vehicle.trim() || !selectedService) return;
@@ -244,12 +248,7 @@ function App() {
       issue: selectedService.name,
       color: mechanic.color,
       mechanicId: mechanic.id,
-      items: [{ 
-        type: 'JASA', 
-        name: selectedService.name, 
-        price: selectedService.price,
-        qty: 1 
-      }] 
+      items: [{ type: 'JASA', name: selectedService.name, price: selectedService.price, qty: 1 }] 
     };
 
     try {
@@ -261,7 +260,9 @@ function App() {
       const newOrder = await res.json();
       if (!res.ok) throw new Error(newOrder.error);
 
-      fetchData();
+      // Tambahkan ke state lokal, tidak perlu fetchData
+      setOrders((current) => [newOrder, ...current]);
+      
       setOrderDialogOpen(false);
       setTicketPreview(newOrder);
       setServiceForm({ vehicle: '', plate: '', customer: '', phone: '', issue: '', serviceType: '', mechanicId: '' });
@@ -313,7 +314,23 @@ function App() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      fetchData();
+      // Update state lokal
+      if (selection.mode === 'service' && selection.order?.id) {
+        // Hapus order dari Kanban
+        setOrders((current) => current.filter(o => o.id !== selection.order!.id));
+      }
+      
+      // Tambah transaksi baru ke laporan
+      if (data.transaction) {
+        setTransactions((current) => [data.transaction, ...current]);
+      }
+
+      // Potong stok sparepart di state lokal
+      setParts((current) => current.map(part => {
+        const line = selection.lines.find(l => l.id === part.id || l.name.toLowerCase() === part.name.toLowerCase());
+        return line ? { ...part, stock: Math.max(0, part.stock - line.qty) } : part;
+      }));
+
       setCashierSelection(null);
       setFinalReceipt(selection);
       setCart([]);
@@ -328,9 +345,12 @@ function App() {
         method: 'PUT',
         body: JSON.stringify({ accepted }),
       });
+      
+      const data = await res.json();
       if (!res.ok) throw new Error('Gagal memproses persetujuan');
       
-      fetchData();
+      // Update state lokal
+      setOrders((current) => current.map(o => o.trackingToken === token ? data : o));
       showToast(accepted ? 'Biaya tambahan disetujui' : 'Biaya tambahan ditolak');
     } catch (error) {
       console.error(error);
@@ -392,11 +412,11 @@ function App() {
           {activeView === 'cashier' ? (
             <CashierPage key={cashierSelection?.order?.id || 'empty'} selection={cashierSelection} orders={orders} onSelectOrder={openCashierForOrder} onPaid={handlePaid} />
           ) : activeView === 'settings' ? (
-            <SettingsPage showToast={showToast} mechanics={mechanics} refreshData={fetchData} />
+            <SettingsPage showToast={showToast} mechanics={mechanics} setMechanics={setMechanics} />
           ) : activeView === 'reports' ? (
             <ReportsPage transactions={transactions} showToast={showToast} />
           ) : activeView === 'stock' ? (
-            <StockPage parts={parts} setParts={setParts} services={services} refreshData={fetchData} showToast={showToast} />
+            <StockPage parts={parts} setParts={setParts} services={services} setServices={setServices} showToast={showToast} />
           ) : (
           <>
           <div className="page-heading">

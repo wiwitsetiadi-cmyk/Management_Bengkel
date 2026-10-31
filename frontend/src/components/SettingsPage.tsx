@@ -5,7 +5,7 @@ import { fetchApi } from '../api';
 
 type SettingsTab = 'mechanics' | 'commission';
 
-export default function SettingsPage({ showToast, mechanics, refreshData }: { showToast: (msg: string) => void; mechanics: Mechanic[]; refreshData: () => void }) {
+export default function SettingsPage({ showToast, mechanics, setMechanics }: { showToast: (msg: string) => void; mechanics: Mechanic[]; setMechanics: React.Dispatch<React.SetStateAction<Mechanic[]>> }) {
   const [activeTab, setActiveTab] = useState<SettingsTab>('mechanics');
   const [showMechanicModal, setShowMechanicModal] = useState(false);
   const [editingMechanic, setEditingMechanic] = useState<Mechanic | null>(null);
@@ -21,19 +21,31 @@ export default function SettingsPage({ showToast, mechanics, refreshData }: { sh
         <button className={`settings-tab ${activeTab === 'commission' ? 'active' : ''}`} onClick={() => setActiveTab('commission')}>Aturan Komisi</button>
       </div>
 
-      {activeTab === 'mechanics' && <MechanicsTab mechanics={mechanics} onAdd={() => { setEditingMechanic(null); setShowMechanicModal(true); }} onEdit={(m) => { setEditingMechanic(m); setShowMechanicModal(true); }} refreshData={refreshData} showToast={showToast} />}
+      {activeTab === 'mechanics' && <MechanicsTab mechanics={mechanics} setMechanics={setMechanics} onAdd={() => { setEditingMechanic(null); setShowMechanicModal(true); }} onEdit={(m) => { setEditingMechanic(m); setShowMechanicModal(true); }} showToast={showToast} />}
       {activeTab === 'commission' && <CommissionTab showToast={showToast} />}
 
-      {showMechanicModal && <MechanicModal mechanic={editingMechanic} mechanics={mechanics} onClose={() => setShowMechanicModal(false)} onSuccess={() => { setShowMechanicModal(false); refreshData(); showToast('Data mekanik disimpan'); }} />}
+      {showMechanicModal && <MechanicModal mechanic={editingMechanic} mechanics={mechanics} onClose={() => setShowMechanicModal(false)} onSuccess={(updatedMechanic, isEdit) => {
+        if (isEdit) {
+          setMechanics(curr => curr.map(m => m.id === updatedMechanic.id ? updatedMechanic : m));
+        } else {
+          setMechanics(curr => [...curr, updatedMechanic]);
+        }
+        setShowMechanicModal(false);
+        showToast(isEdit ? 'Data mekanik diperbarui' : 'Mekanik baru ditambahkan');
+      }} />}
     </div>
   );
 }
 
-function MechanicsTab({ mechanics, onAdd, onEdit, refreshData, showToast }: { mechanics: Mechanic[]; onAdd: () => void; onEdit: (m: Mechanic) => void; refreshData: () => void; showToast: (msg: string) => void }) {
+function MechanicsTab({ mechanics, setMechanics, onAdd, onEdit, showToast }: { mechanics: Mechanic[]; setMechanics: React.Dispatch<React.SetStateAction<Mechanic[]>>; onAdd: () => void; onEdit: (m: Mechanic) => void; showToast: (msg: string) => void }) {
   const toggleActive = async (m: Mechanic) => {
     try {
-      await fetchApi(`/api/mechanics/${m.id}`, { method: 'PUT', body: JSON.stringify({ name: m.name, isActive: !m.isActive }) });
-      refreshData();
+      const res = await fetchApi(`/api/mechanics/${m.id}`, { method: 'PUT', body: JSON.stringify({ name: m.name, isActive: !m.isActive }) });
+      if (!res.ok) throw new Error();
+      const updated = await res.json();
+      
+      // Update Local State
+      setMechanics(curr => curr.map(item => item.id === m.id ? updated : item));
     } catch { showToast('Gagal mengubah status mekanik'); }
   };
 
@@ -92,7 +104,7 @@ function CommissionTab({ showToast }: { showToast: (msg: string) => void }) {
   );
 }
 
-function MechanicModal({ mechanic, mechanics, onClose, onSuccess }: { mechanic: Mechanic | null; mechanics: Mechanic[]; onClose: () => void; onSuccess: () => void }) {
+function MechanicModal({ mechanic, mechanics, onClose, onSuccess }: { mechanic: Mechanic | null; mechanics: Mechanic[]; onClose: () => void; onSuccess: (updatedMechanic: Mechanic, isEdit: boolean) => void; }) {
   const [name, setName] = useState(mechanic?.name || '');
   const nextCode = `MK-${String(Math.max(0, ...mechanics.map(m => Number(m.code.replace('MK-','')))) + 1).padStart(3, '0')}`;
   const code = mechanic?.code || nextCode;
@@ -102,12 +114,17 @@ function MechanicModal({ mechanic, mechanics, onClose, onSuccess }: { mechanic: 
   const save = async () => {
     setSaving(true);
     try {
+      let res;
       if (mechanic) {
-        await fetchApi(`/api/mechanics/${mechanic.id}`, { method: 'PUT', body: JSON.stringify({ name, isActive: mechanic.isActive }) });
+        res = await fetchApi(`/api/mechanics/${mechanic.id}`, { method: 'PUT', body: JSON.stringify({ name, isActive: mechanic.isActive }) });
       } else {
-        await fetchApi('/api/mechanics', { method: 'POST', body: JSON.stringify({ code, name, initials: initials || name.slice(0,2).toUpperCase(), color: '#DCEBE9' }) });
+        res = await fetchApi('/api/mechanics', { method: 'POST', body: JSON.stringify({ code, name, initials: initials || name.slice(0,2).toUpperCase(), color: '#DCEBE9' }) });
       }
-      onSuccess();
+      
+      if (!res.ok) throw new Error();
+      const data = await res.json();
+      
+      onSuccess(data, !!mechanic);
     } catch { alert('Gagal menyimpan mekanik'); } finally { setSaving(false); }
   };
 
