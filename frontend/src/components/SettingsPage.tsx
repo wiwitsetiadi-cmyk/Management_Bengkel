@@ -24,7 +24,7 @@ export default function SettingsPage({ showToast, mechanics, setMechanics }: { s
       {activeTab === 'mechanics' && <MechanicsTab mechanics={mechanics} setMechanics={setMechanics} onAdd={() => { setEditingMechanic(null); setShowMechanicModal(true); }} onEdit={(m) => { setEditingMechanic(m); setShowMechanicModal(true); }} showToast={showToast} />}
       {activeTab === 'commission' && <CommissionTab showToast={showToast} />}
 
-      {showMechanicModal && <MechanicModal mechanic={editingMechanic} mechanics={mechanics} onClose={() => setShowMechanicModal(false)} onSuccess={(updatedMechanic, isEdit) => {
+      {showMechanicModal && <MechanicModal mechanic={editingMechanic} mechanics={mechanics} onClose={() => setShowMechanicModal(false)} showToast={showToast} onSuccess={(updatedMechanic, isEdit) => {
         if (isEdit) {
           setMechanics(curr => curr.map(m => m.id === updatedMechanic.id ? updatedMechanic : m));
         } else {
@@ -104,7 +104,7 @@ function CommissionTab({ showToast }: { showToast: (msg: string) => void }) {
   );
 }
 
-function MechanicModal({ mechanic, mechanics, onClose, onSuccess }: { mechanic: Mechanic | null; mechanics: Mechanic[]; onClose: () => void; onSuccess: (updatedMechanic: Mechanic, isEdit: boolean) => void; }) {
+function MechanicModal({ mechanic, mechanics, onClose, onSuccess, showToast }: { mechanic: Mechanic | null; mechanics: Mechanic[]; onClose: () => void; onSuccess: (updatedMechanic: Mechanic, isEdit: boolean) => void; showToast: (msg: string) => void; }) {
   const [name, setName] = useState(mechanic?.name || '');
   const nextCode = `MK-${String(Math.max(0, ...mechanics.map(m => Number(m.code.replace('MK-','')))) + 1).padStart(3, '0')}`;
   const code = mechanic?.code || nextCode;
@@ -125,7 +125,12 @@ function MechanicModal({ mechanic, mechanics, onClose, onSuccess }: { mechanic: 
       const data = await res.json();
       
       onSuccess(data, !!mechanic);
-    } catch { alert('Gagal menyimpan mekanik'); } finally { setSaving(false); }
+    } catch { 
+      // PERBAIKAN: Ganti alert() dengan showToast()
+      showToast('Gagal menyimpan mekanik'); 
+    } finally { 
+      setSaving(false); 
+    }
   };
 
   return (
