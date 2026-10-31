@@ -21,8 +21,9 @@ import {
 } from 'lucide-react';
 
 import { allowedTransitions, columns } from './data';
-import type { Mechanic, Sparepart, Service, Order, Transaction, CartItem, CashierSelection, CashierLine, OrderMode, OrderStatus } from './data';
+import type { Order, CartItem, CashierSelection, CashierLine, OrderMode, OrderStatus } from './data';
 import { fetchApi } from './api';
+import { useData } from './hooks/useData'; // <-- Import Custom Hook
 
 const navItems = [
   { label: 'Dasbor', icon: LayoutDashboard },
@@ -42,16 +43,11 @@ function App() {
     try { return JSON.parse(stored) as AuthUser; } catch { return null; }
   });
 
-  const [orders, setOrders] = useState<Order[]>([]);
-  const [parts, setParts] = useState<Sparepart[]>([]);
-  const [services, setServices] = useState<Service[]>([]);
-  const [transactions, setTransactions] = useState<Transaction[]>([]);
-  const [mechanics, setMechanics] = useState<Mechanic[]>([]);
-
+  // === UI STATE (Hanya untuk tampilan) ===
+  const [toast, setToast] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<OrderStatus | null>(null);
-  const [toast, setToast] = useState<string | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [orderDialogOpen, setOrderDialogOpen] = useState(false);
   const [orderMode, setOrderMode] = useState<OrderMode>('service');
@@ -74,12 +70,23 @@ function App() {
   const [searchFocused, setSearchFocused] = useState(false);
   const [trackingCode, setTrackingCode] = useState<string | null>(trackingMatch ? trackingMatch[1] : null);
 
-  const stockAlerts = useMemo(() => getStockAlerts(parts), [parts]);
-
+  // === TOAST HANDLER ===
   const showToast = (message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(null), 3400);
   };
+
+  // === DATA STATE (Diambil dari Custom Hook) ===
+  const { 
+    orders, setOrders, 
+    parts, setParts, 
+    services, setServices, 
+    transactions, setTransactions, 
+    mechanics, setMechanics, 
+    fetchData 
+  } = useData(showToast);
+
+  const stockAlerts = useMemo(() => getStockAlerts(parts), [parts]);
 
   const handleLogin = (user: AuthUser) => setAuthUser(user);
   const handleLogout = () => {
@@ -88,30 +95,9 @@ function App() {
     setAuthUser(null);
   };
 
-  // fetchData TETAP DIGUNAKAN UNTUK PERTAMA KALI LOAD / RELOAD
-  const fetchData = async () => {
-    try {
-      const [resOrders, resParts, resTransactions, resMechanics, resServices] = await Promise.all([
-        fetchApi('/api/orders'),
-        fetchApi('/api/spareparts'),
-        fetchApi('/api/transactions'),
-        fetchApi('/api/mechanics'),
-        fetchApi('/api/services')
-      ]);
-      setOrders(await resOrders.json());
-      setParts(await resParts.json());
-      setTransactions(await resTransactions.json());
-      setMechanics(await resMechanics.json());
-      setServices(await resServices.json());
-    } catch (error) {
-      console.error(error);
-      showToast('Gagal terhubung ke database server');
-    }
-  };
-
   useEffect(() => {
     if (authUser) fetchData();
-  }, [authUser]);
+  }, [authUser, fetchData]);
 
   useEffect(() => {
     const handlePop = () => {
@@ -150,7 +136,6 @@ function App() {
     if (!order || order.status === status || !allowedTransitions[order.status].includes(status)) return;
     
     const prevOrders = [...orders];
-    // Optimistic Update
     setOrders((current) => current.map((item) => (item.id === orderId ? { ...item, status } : item)));
     setDropTarget(null);
     
@@ -162,13 +147,12 @@ function App() {
       if (!res.ok) {
         const data = await res.json();
         showToast(data.error || 'Gagal update status');
-        setOrders(prevOrders); // Rollback jika gagal
+        setOrders(prevOrders); 
       }
-      // fetchData() DIHAPUS
     } catch (error) {
       console.error(error);
       showToast('Gagal update ke database');
-      setOrders(prevOrders); // Rollback jika error koneksi
+      setOrders(prevOrders);
     }
   };
 
@@ -193,7 +177,6 @@ function App() {
       }
 
       setSelectedOrder(null);
-      // Update state lokal dengan data baru dari backend (termasuk items tambahan)
       setOrders((current) => current.map((o) => (o.id === selectedOrder.id ? data : o)));
     } catch (error) {
       console.error(error);
@@ -217,7 +200,7 @@ function App() {
   const filteredParts = parts.filter((part) => part.name.toLowerCase().includes(partSearch.toLowerCase()));
   const cartTotal = cart.reduce((total, item) => total + item.price * item.qty, 0);
 
-  const addPart = (part: Sparepart) => {
+  const addPart = (part: any) => {
     setCart((current) => {
       const existing = current.find((item) => item.id === part.id);
       if (existing) return current.map((item) => (item.id === part.id ? { ...item, qty: Math.min(item.qty + 1, item.stock) } : item));
@@ -260,9 +243,7 @@ function App() {
       const newOrder = await res.json();
       if (!res.ok) throw new Error(newOrder.error);
 
-      // Tambahkan ke state lokal, tidak perlu fetchData
       setOrders((current) => [newOrder, ...current]);
-      
       setOrderDialogOpen(false);
       setTicketPreview(newOrder);
       setServiceForm({ vehicle: '', plate: '', customer: '', phone: '', issue: '', serviceType: '', mechanicId: '' });
@@ -314,18 +295,14 @@ function App() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      // Update state lokal
       if (selection.mode === 'service' && selection.order?.id) {
-        // Hapus order dari Kanban
         setOrders((current) => current.filter(o => o.id !== selection.order!.id));
       }
       
-      // Tambah transaksi baru ke laporan
       if (data.transaction) {
         setTransactions((current) => [data.transaction, ...current]);
       }
 
-      // Potong stok sparepart di state lokal
       setParts((current) => current.map(part => {
         const line = selection.lines.find(l => l.id === part.id || l.name.toLowerCase() === part.name.toLowerCase());
         return line ? { ...part, stock: Math.max(0, part.stock - line.qty) } : part;
@@ -349,7 +326,6 @@ function App() {
       const data = await res.json();
       if (!res.ok) throw new Error('Gagal memproses persetujuan');
       
-      // Update state lokal
       setOrders((current) => current.map(o => o.trackingToken === token ? data : o));
       showToast(accepted ? 'Biaya tambahan disetujui' : 'Biaya tambahan ditolak');
     } catch (error) {
