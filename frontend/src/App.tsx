@@ -1,4 +1,7 @@
-import { useEffect, useMemo, useState } from 'react';
+// frontend/src/App.tsx
+
+// 1. Tambahkan useCallback pada import React
+import { useEffect, useMemo, useState, useCallback } from 'react';
 import TrackingPage from './components/TrackingPage';
 import SettingsPage from './components/SettingsPage';
 import ReportsPage from './components/ReportsPage';
@@ -72,10 +75,11 @@ function App() {
   const [searchFocused, setSearchFocused] = useState(false);
   const [trackingCode, setTrackingCode] = useState<string | null>(trackingMatch ? trackingMatch[1] : null);
 
-  const showToast = (message: string) => {
+  // 2. Bungkus showToast dengan useCallback agar referensinya tidak berubah-ubah
+  const showToast = useCallback((message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(null), 3400);
-  };
+  }, []);
 
   const { 
     orders, setOrders, 
@@ -96,18 +100,17 @@ function App() {
     setAuthUser(null);
   };
 
-  // Menangkap event 401 dari api.ts untuk logout bersih tanpa reload halaman
   useEffect(() => {
     const handleSessionExpired = () => {
-      // Menyimpan pesan agar bisa dibaca oleh komponen AdminLogin
       sessionStorage.setItem('bengkel_session_msg', 'Sesi Anda telah berakhir. Silakan login kembali.');
-      setAuthUser(null); // Memicu React merender halaman login secara natural
+      setAuthUser(null);
     };
 
     window.addEventListener('auth:expired', handleSessionExpired);
     return () => window.removeEventListener('auth:expired', handleSessionExpired);
   }, []);
 
+  // 3. Sekarang useEffect ini hanya akan berjalan SEKALI saat login, atau saat authUser berubah
   useEffect(() => {
     if (authUser) fetchData();
   }, [authUser, fetchData]);
