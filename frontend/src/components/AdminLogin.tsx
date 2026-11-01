@@ -14,7 +14,16 @@ export default function AdminLogin({ onLogin }: { onLogin: (user: AuthUser) => v
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
-  const [error, setError] = useState<string | null>(null);
+  
+  // Mengambil pesan sesi habis dari sessionStorage jika ada (dikirim dari App.tsx)
+  const [error, setError] = useState<string | null>(() => {
+    const sessionMsg = sessionStorage.getItem('bengkel_session_msg');
+    if (sessionMsg) {
+      sessionStorage.removeItem('bengkel_session_msg');
+      return sessionMsg;
+    }
+    return null;
+  });
 
   const submitLogin = async (event: FormEvent<HTMLFormElement>) => {
     event.preventDefault();
