@@ -1,17 +1,11 @@
 import { useMemo, useState } from 'react';
 import { AlertTriangle, Check, Edit3, Package, Plus, Search, X, Wrench, Trash2 } from 'lucide-react';
+// ✅ DIUBAH: Menambahkan formatRupiah ke dalam import dari ../data
+import { getStockAlerts, getStockStatus, formatRupiah } from '../data';
 import type { Sparepart, Service } from '../data';
 import { fetchApi } from '../api';
 
-type StockStatus = 'aman' | 'menipis' | 'habis';
-
-const formatRupiah = (value: number) => `Rp ${value.toLocaleString('id-ID')}`;
-
-const getStockStatus = (part: Sparepart): StockStatus => {
-  if (part.stock === 0) return 'habis';
-  if (part.stock <= part.minStock) return 'menipis';
-  return 'aman';
-};
+// ❌ DIHAPUS: type StockStatus, getStockStatus, getStockAlerts, dan formatRupiah lokal
 
 const categories = ['CVT', 'Oli & Cairan', 'Rem', 'Ignition', 'Ban', 'Rantai', 'Filter', 'Lainnya'];
 
@@ -22,15 +16,6 @@ const nextPartCode = (parts: Sparepart[]) => {
   }, 0);
   return `SP-${String(maxNum + 1).padStart(3, '0')}`;
 };
-
-export function getStockAlerts(parts: Sparepart[]) {
-  return parts
-    .filter((p) => getStockStatus(p) !== 'aman')
-    .sort((a, b) => {
-      const order = { habis: 0, menipis: 1, aman: 2 };
-      return order[getStockStatus(a)] - order[getStockStatus(b)];
-    });
-}
 
 type PartPayload = { name: string; code: string; category: string; price: number; stock: number; minStock: number; };
 type ServicePayload = { name: string; price: number; };
@@ -98,7 +83,6 @@ export default function StockPage({
       
       showToast(editingPart ? 'Data sparepart diperbarui' : 'Sparepart baru ditambahkan');
       
-      // Update Local State
       if (editingPart) {
         setParts((current) => current.map(p => p.id === editingPart.id ? json : p));
       } else {
@@ -123,7 +107,6 @@ export default function StockPage({
         return;
       }
       
-      // Update Local State
       setParts((current) => current.map(p => p.id === part.id ? json : p));
       
       setRestockPart(null);
@@ -153,7 +136,6 @@ export default function StockPage({
       
       showToast(editingService ? 'Data servis diperbarui' : 'Servis baru ditambahkan');
       
-      // Update Local State
       if (editingService) {
         setServices((current) => current.map(s => s.id === editingService.id ? json : s));
       } else {
@@ -173,7 +155,6 @@ export default function StockPage({
     try {
       const res = await fetchApi(`/api/services/${id}`, { method: 'DELETE' });
       if (res.ok) {
-        // Update Local State
         setServices((current) => current.filter(s => s.id !== id));
         showToast('Servis dihapus');
       }

@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import TrackingPage from './components/TrackingPage';
 import SettingsPage from './components/SettingsPage';
 import ReportsPage from './components/ReportsPage';
-import StockPage, { getStockAlerts } from './components/StockPage';
+import StockPage from './components/StockPage'; // ❌ DIHAPUS: , { getStockAlerts }
 
 import AdminLogin from './components/AdminLogin';
 import type { AuthUser } from './components/AdminLogin';
@@ -20,7 +20,8 @@ import {
   CreditCard, LayoutDashboard, Package, PanelLeft, Plus, Search, Settings, Wrench, X,
 } from 'lucide-react';
 
-import { allowedTransitions, columns } from './data';
+// ✅ DIUBAH: Import getStockAlerts dari ./data, bukan dari StockPage
+import { allowedTransitions, columns, getStockAlerts } from './data';
 import type {
   Order, CartItem, CashierSelection, CashierLine, OrderMode, OrderStatus,
   Sparepart, AdditionalItemPayload,
@@ -250,7 +251,7 @@ function App() {
       setOrderDialogOpen(false);
       setTicketPreview(newOrder);
       setServiceForm({ vehicle: '', plate: '', customer: '', phone: '', issue: '', serviceType: '', mechanicId: '' });
-    } catch (error) {
+    } catch { // ✅ DIUBAH: Menghapus parameter error yang tidak terpakai
       showToast('Gagal menyimpan pesanan ke database');
     }
   };
