@@ -15,7 +15,6 @@ export default function AdminLogin({ onLogin }: { onLogin: (user: AuthUser) => v
   const [showPassword, setShowPassword] = useState(false);
   const [loading, setLoading] = useState(false);
   
-  // Mengambil pesan sesi habis dari sessionStorage jika ada (dikirim dari App.tsx)
   const [error, setError] = useState<string | null>(() => {
     const sessionMsg = sessionStorage.getItem('bengkel_session_msg');
     if (sessionMsg) {
@@ -105,9 +104,12 @@ export default function AdminLogin({ onLogin }: { onLogin: (user: AuthUser) => v
           )}
 
           <form className="admin-login-form" onSubmit={submitLogin}>
-            <label className="admin-login-field">
+            <label className="admin-login-field" htmlFor="admin-email">
               <span>Email</span>
+              {/* Perbaikan: Menambahkan id dan name pada input email */}
               <input
+                id="admin-email"
+                name="email"
                 type="email"
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
@@ -117,10 +119,13 @@ export default function AdminLogin({ onLogin }: { onLogin: (user: AuthUser) => v
                 required
               />
             </label>
-            <label className="admin-login-field">
+            <label className="admin-login-field" htmlFor="admin-password">
               <span>Kata sandi</span>
               <div className="admin-password-input">
+                {/* Perbaikan: Menambahkan id dan name pada input password */}
                 <input
+                  id="admin-password"
+                  name="password"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(event) => setPassword(event.target.value)}
@@ -139,7 +144,11 @@ export default function AdminLogin({ onLogin }: { onLogin: (user: AuthUser) => v
               </div>
             </label>
             <div className="admin-login-options">
-              <label><input type="checkbox" /> <span>Ingat saya</span></label>
+              {/* Perbaikan: Menambahkan id dan name pada input checkbox */}
+              <label htmlFor="remember-me">
+                <input id="remember-me" name="remember-me" type="checkbox" /> 
+                <span>Ingat saya</span>
+              </label>
               <span>Sesi 24 jam</span>
             </div>
             <button className="primary-button" type="submit" disabled={loading}>
