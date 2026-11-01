@@ -98,7 +98,6 @@ export default function OrderDrawer({
     setItemSparepartId(null);
   };
 
-  // ✅ DIUBAH: Menghindari destructuring variabel yang tidak dipakai (fix warning no-unused-vars)
   const getAdditionalItemsPayload = (): AdditionalItemPayload[] => {
     return additionalItems.map((item) => ({
       id: item.id,
@@ -165,7 +164,8 @@ export default function OrderDrawer({
           </div>
           <div className="add-item-grid">
             <div className="autocomplete-field">
-              <input disabled={isLocked} value={itemName} onChange={(event) => { setItemName(event.target.value); setItemStock(null); setItemError(''); setItemSparepartId(null); }} placeholder="Nama item / cari stok" />
+              {/* Perbaikan: Menambahkan id dan name */}
+              <input id="extra-item-name" name="extra-item-name" disabled={isLocked} value={itemName} onChange={(event) => { setItemName(event.target.value); setItemStock(null); setItemError(''); setItemSparepartId(null); }} placeholder="Nama item / cari stok" />
               {itemName && !isLocked && !itemSparepartId && (
                 <div className="item-suggestions">
                   {parts.filter((part) => part.name.toLowerCase().includes(itemName.toLowerCase())).slice(0, 3).map((part) => (
@@ -176,9 +176,10 @@ export default function OrderDrawer({
                 </div>
               )}
             </div>
-            <select disabled={isLocked} value={itemType} onChange={(event) => setItemType(event.target.value as DetailItem['type'])}><option value="SPAREPART">Sparepart</option><option value="JASA">Jasa</option></select>
-            <input disabled={isLocked} className="qty-input" value={itemQty} onChange={(event) => setItemQty(event.target.value)} inputMode="numeric" />
-            <input disabled={isLocked} className="price-input" value={itemPrice} onChange={(event) => setItemPrice(event.target.value)} placeholder="Harga" inputMode="numeric" />
+            {/* Perbaikan: Menambahkan id dan name pada select dan input lainnya */}
+            <select id="extra-item-type" name="extra-item-type" disabled={isLocked} value={itemType} onChange={(event) => setItemType(event.target.value as DetailItem['type'])}><option value="SPAREPART">Sparepart</option><option value="JASA">Jasa</option></select>
+            <input id="extra-item-qty" name="extra-item-qty" disabled={isLocked} className="qty-input" value={itemQty} onChange={(event) => setItemQty(event.target.value)} inputMode="numeric" />
+            <input id="extra-item-price" name="extra-item-price" disabled={isLocked} className="price-input" value={itemPrice} onChange={(event) => setItemPrice(event.target.value)} placeholder="Harga" inputMode="numeric" />
             <button className="secondary-button add-item-button" disabled={isLocked} onClick={addDetailItem}><Plus size={15} /></button>
           </div>
           {itemError ? (
@@ -195,11 +196,13 @@ export default function OrderDrawer({
         </div>
         
         <div className="drawer-footer drawer-footer-sticky" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
+          
           {order.status === 'QUEUE' && (
             <button className="primary-button full-width" onClick={() => onStatusChange('WORKING', [])}>
               Mulai Dikerjakan <ChevronRight size={15} />
             </button>
           )}
+
           {order.status === 'WORKING' && additionalItems.length > 0 && (
             <>
               <button className="primary-button full-width" onClick={() => onStatusChange('READY', getAdditionalItemsPayload())}>
@@ -210,16 +213,19 @@ export default function OrderDrawer({
               </button>
             </>
           )}
+
           {order.status === 'WORKING' && additionalItems.length === 0 && (
             <button className="primary-button full-width" onClick={() => onStatusChange('READY', [])}>
               Selesai & Siap Bayar <ChevronRight size={15} />
             </button>
           )}
+
           {order.status === 'APPROVAL' && (
             <button className="primary-button full-width" onClick={() => onStatusChange('READY', order.items.filter(i => i.isAdditional))}>
               Lanjut ke Siap Bayar <ChevronRight size={15} />
             </button>
           )}
+
         </div>
       </aside>
     </div>
