@@ -16,10 +16,13 @@ export const fetchApi = async (endpoint: string, options: RequestInit = {}) => {
   });
 
   if (response.status === 401) {
-    // Token kadaluarsa atau tidak valid, paksa logout
+    // Menghapus token yang sudah tidak valid
     localStorage.removeItem('bengkel_token');
     localStorage.removeItem('bengkel_user');
-    window.location.reload();
+    
+    // Mengirim event kustom agar ditangkap oleh komponen App tanpa melakukan reload halaman
+    window.dispatchEvent(new CustomEvent('auth:expired'));
+    
     throw new Error('Sesi habis, silakan login ulang');
   }
 
