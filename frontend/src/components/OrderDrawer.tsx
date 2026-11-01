@@ -1,7 +1,7 @@
 import { useState, useMemo } from 'react';
 import { X, Check, FileText, Package, Plus, Trash2, ChevronRight, AlertCircle, CheckCircle } from 'lucide-react';
 import { formatRupiah, columns } from '../data';
-import type { Order, OrderStatus, Sparepart } from '../data';
+import type { Order, OrderStatus, Sparepart, AdditionalItemPayload } from '../data';
 
 type DetailItem = {
   id: string;
@@ -36,8 +36,7 @@ export default function OrderDrawer({
   order: Order; 
   parts: Sparepart[]; 
   onClose: () => void; 
-  onStatusChange: (status: OrderStatus, additionalItems?: any[]) => void; 
-  // props showToast sudah dihapus karena tidak dipakai lagi
+  onStatusChange: (status: OrderStatus, additionalItems?: AdditionalItemPayload[]) => void; 
 }) {
   const initialItems = useMemo(() => {
     return (order.items || []).map((item) => {
@@ -99,7 +98,7 @@ export default function OrderDrawer({
     setItemSparepartId(null);
   };
 
-  const getAdditionalItemsPayload = () => {
+  const getAdditionalItemsPayload = (): AdditionalItemPayload[] => {
     return additionalItems.map(({ additional, locked, stock, ...item }) => item);
   };
 
