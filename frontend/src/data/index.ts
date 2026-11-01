@@ -80,16 +80,38 @@ export type CashierLine = {
   price: number;
 };
 
+// ============================================================
+// TIPE PEMBAYARAN KASIR (pengganti any[])
+// ============================================================
+export type PaymentEntry = {
+  id: number;
+  method: string;
+  amount: number;
+};
+
 export type CashierSelection = {
   mode: 'service' | 'parts';
   order?: Order;
   lines: CashierLine[];
   total: number;
-  payments?: any[];
+  payments?: PaymentEntry[];
   change?: number;
 };
 
 export type CartItem = Sparepart & { qty: number };
+
+// ============================================================
+// TIPE PAYLOAD ITEM TAMBAHAN (pengganti any[])
+// Dipakai oleh App.tsx dan OrderDrawer.tsx
+// ============================================================
+export type AdditionalItemPayload = {
+  id?: string;
+  name: string;
+  type: ItemType;
+  qty: number;
+  price: number;
+  sparepartId?: string | null;
+};
 
 // ============================================================
 // ATURAN & KONSTANTA
