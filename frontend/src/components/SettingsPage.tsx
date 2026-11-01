@@ -44,7 +44,6 @@ function MechanicsTab({ mechanics, setMechanics, onAdd, onEdit, showToast }: { m
       if (!res.ok) throw new Error();
       const updated = await res.json();
       
-      // Update Local State
       setMechanics(curr => curr.map(item => item.id === m.id ? updated : item));
     } catch { showToast('Gagal mengubah status mekanik'); }
   };
@@ -96,8 +95,22 @@ function CommissionTab({ showToast }: { showToast: (msg: string) => void }) {
   return (
     <div className="settings-content fade-in">
       <div className="settings-form-grid">
-        <label className="settings-form-field"><span>Komisi Jasa (%)</span><div className="settings-percent-input"><input type="number" value={servicePercent} onChange={(e) => setServicePercent(e.target.value)} /><em>%</em></div></label>
-        <label className="settings-form-field"><span>Komisi Sparepart (%)</span><div className="settings-percent-input"><input type="number" value={partsPercent} onChange={(e) => setPartsPercent(e.target.value)} /><em>%</em></div></label>
+        <label className="settings-form-field" htmlFor="commission-service">
+          <span>Komisi Jasa (%)</span>
+          <div className="settings-percent-input">
+            {/* Perbaikan: Menambahkan id dan name pada input */}
+            <input id="commission-service" name="commission-service" type="number" value={servicePercent} onChange={(e) => setServicePercent(e.target.value)} />
+            <em>%</em>
+          </div>
+        </label>
+        <label className="settings-form-field" htmlFor="commission-parts">
+          <span>Komisi Sparepart (%)</span>
+          <div className="settings-percent-input">
+            {/* Perbaikan: Menambahkan id dan name pada input */}
+            <input id="commission-parts" name="commission-parts" type="number" value={partsPercent} onChange={(e) => setPartsPercent(e.target.value)} />
+            <em>%</em>
+          </div>
+        </label>
       </div>
       <div className="settings-save-bar"><button className="primary-button" disabled={saving} onClick={save}>Simpan</button></div>
     </div>
@@ -126,7 +139,6 @@ function MechanicModal({ mechanic, mechanics, onClose, onSuccess, showToast }: {
       
       onSuccess(data, !!mechanic);
     } catch { 
-      // PERBAIKAN: Ganti alert() dengan showToast()
       showToast('Gagal menyimpan mekanik'); 
     } finally { 
       setSaving(false); 
@@ -138,9 +150,19 @@ function MechanicModal({ mechanic, mechanics, onClose, onSuccess, showToast }: {
       <section className="settings-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-heading"><h2>{mechanic ? 'Edit' : 'Tambah'} Mekanik</h2><button className="close-button" onClick={onClose}><X size={20} /></button></div>
         <div className="settings-modal-body">
-          <label className="settings-form-field"><span>ID Mekanik</span><input value={code} readOnly /></label>
-          <label className="settings-form-field"><span>Nama *</span><input value={name} onChange={(e) => setName(e.target.value)} /></label>
-          <label className="settings-form-field"><span>Inisial</span><input value={initials} onChange={(e) => setInitials(e.target.value)} maxLength={2} /></label>
+          {/* Perbaikan: Menambahkan id dan name pada semua input di Modal */}
+          <label className="settings-form-field" htmlFor="mechanic-code">
+            <span>ID Mekanik</span>
+            <input id="mechanic-code" name="mechanic-code" value={code} readOnly />
+          </label>
+          <label className="settings-form-field" htmlFor="mechanic-name">
+            <span>Nama *</span>
+            <input id="mechanic-name" name="mechanic-name" value={name} onChange={(e) => setName(e.target.value)} />
+          </label>
+          <label className="settings-form-field" htmlFor="mechanic-initials">
+            <span>Inisial</span>
+            <input id="mechanic-initials" name="mechanic-initials" value={initials} onChange={(e) => setInitials(e.target.value)} maxLength={2} />
+          </label>
         </div>
         <div className="dialog-footer"><button className="secondary-button" onClick={onClose}>Batal</button><button className="primary-button" disabled={saving || !name} onClick={save}>Simpan</button></div>
       </section>
