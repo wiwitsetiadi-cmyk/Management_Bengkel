@@ -23,9 +23,6 @@ export type Sparepart = {
   price: number;
 };
 
-// ============================================================
-// TAMBAHAN BARU: Tipe Data Katalog Servis
-// ============================================================
 export type Service = {
   id: string;
   name: string;
@@ -80,9 +77,6 @@ export type CashierLine = {
   price: number;
 };
 
-// ============================================================
-// TIPE PEMBAYARAN KASIR (pengganti any[])
-// ============================================================
 export type PaymentEntry = {
   id: number;
   method: string;
@@ -100,10 +94,6 @@ export type CashierSelection = {
 
 export type CartItem = Sparepart & { qty: number };
 
-// ============================================================
-// TIPE PAYLOAD ITEM TAMBAHAN (pengganti any[])
-// Dipakai oleh App.tsx dan OrderDrawer.tsx
-// ============================================================
 export type AdditionalItemPayload = {
   id?: string;
   name: string;
@@ -112,6 +102,24 @@ export type AdditionalItemPayload = {
   price: number;
   sparepartId?: string | null;
 };
+
+// ============================================================
+// ✅ DITAMBAH: Logika Stok dipindah ke sini (dari StockPage.tsx)
+// ============================================================
+export type StockStatus = 'aman' | 'menipis' | 'habis';
+
+export const getStockStatus = (part: Sparepart): StockStatus => {
+  if (part.stock === 0) return 'habis';
+  if (part.stock <= part.minStock) return 'menipis';
+  return 'aman';
+};
+
+export function getStockAlerts(parts: Sparepart[]): Sparepart[] {
+  const order: Record<StockStatus, number> = { habis: 0, menipis: 1, aman: 2 };
+  return parts
+    .filter((p) => getStockStatus(p) !== 'aman')
+    .sort((a, b) => order[getStockStatus(a)] - order[getStockStatus(b)]);
+}
 
 // ============================================================
 // ATURAN & KONSTANTA
