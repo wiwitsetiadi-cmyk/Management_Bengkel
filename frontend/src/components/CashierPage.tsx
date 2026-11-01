@@ -76,7 +76,8 @@ export default function CashierPage({ selection, orders, onSelectOrder, onPaid }
             <div className="payment-row">
               <div className="payment-row-top"><span>Nominal pembayaran</span><span className="manual-payment-label">Input manual admin</span></div>
               <div className="payment-input-row manual-payment-input">
-                <input value={formatInputValue(payments[0]?.amount || 0)} onChange={(event) => updatePayment(Number(event.target.value.replace(/[^0-9]/g, '')))} placeholder="Rp 0" inputMode="numeric" aria-label="Nominal pembayaran" />
+                {/* Perbaikan: Menambahkan id dan name pada input nominal pembayaran */}
+                <input id="payment-amount" name="payment-amount" value={formatInputValue(payments[0]?.amount || 0)} onChange={(event) => updatePayment(Number(event.target.value.replace(/[^0-9]/g, '')))} placeholder="Rp 0" inputMode="numeric" aria-label="Nominal pembayaran" />
               </div>
             </div>
           </div>
