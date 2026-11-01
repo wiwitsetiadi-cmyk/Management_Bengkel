@@ -1,6 +1,3 @@
-// frontend/src/App.tsx
-
-// 1. Tambahkan useCallback pada import React
 import { useEffect, useMemo, useState, useCallback } from 'react';
 import TrackingPage from './components/TrackingPage';
 import SettingsPage from './components/SettingsPage';
@@ -75,7 +72,6 @@ function App() {
   const [searchFocused, setSearchFocused] = useState(false);
   const [trackingCode, setTrackingCode] = useState<string | null>(trackingMatch ? trackingMatch[1] : null);
 
-  // 2. Bungkus showToast dengan useCallback agar referensinya tidak berubah-ubah
   const showToast = useCallback((message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(null), 3400);
@@ -110,7 +106,6 @@ function App() {
     return () => window.removeEventListener('auth:expired', handleSessionExpired);
   }, []);
 
-  // 3. Sekarang useEffect ini hanya akan berjalan SEKALI saat login, atau saat authUser berubah
   useEffect(() => {
     if (authUser) fetchData();
   }, [authUser, fetchData]);
@@ -371,7 +366,8 @@ function App() {
         </div>
         <div className="global-search">
           <Search size={19} />
-          <input aria-label="Cari" value={orderSearch} onChange={(event) => setOrderSearch(event.target.value)} onFocus={() => setSearchFocused(true)} onKeyDown={(event) => { if (event.key === 'Escape') { setOrderSearch(''); setSearchFocused(false); } if (event.key === 'Enter' && searchResults[0]) openSearchResult(searchResults[0]); }} placeholder="Cari No. Pesanan / plat…" />
+          {/* Perbaikan: Menambahkan id dan name pada input pencarian */}
+          <input id="global-search" name="global-search" aria-label="Cari" value={orderSearch} onChange={(event) => setOrderSearch(event.target.value)} onFocus={() => setSearchFocused(true)} onKeyDown={(event) => { if (event.key === 'Escape') { setOrderSearch(''); setSearchFocused(false); } if (event.key === 'Enter' && searchResults[0]) openSearchResult(searchResults[0]); }} placeholder="Cari No. Pesanan / plat…" />
           {orderSearch && <button className="search-clear" onClick={() => setOrderSearch('')}><X size={15} /></button>}
           {searchFocused && orderSearch.trim() && <div className="search-results">{searchResults.length ? searchResults.map((order) => <button key={order.id} className="search-result" onClick={() => openSearchResult(order)}><span><strong>{order.vehicle}</strong><small>{order.plate || 'Tanpa plat'}</small></span><ChevronRight size={15} /></button>) : <div className="search-no-result">Tidak ditemukan</div>}</div>}
         </div>
