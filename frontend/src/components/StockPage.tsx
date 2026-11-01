@@ -43,7 +43,7 @@ export default function StockPage({
   const [showServiceModal, setShowServiceModal] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
   
-  // ✅ DITAMBAH: State untuk target hapus (menggantikan confirm bawaan browser)
+  // State untuk target hapus (menggantikan confirm bawaan browser)
   const [deleteTarget, setDeleteTarget] = useState<Service | null>(null);
 
   const [saving, setSaving] = useState(false);
@@ -150,14 +150,13 @@ export default function StockPage({
     }
   };
 
-  // ✅ DIUBAH: Menghapus confirm() bawaan browser, sekarang dieksekusi dari Modal
   const executeDeleteService = async (id: string) => {
     try {
       const res = await fetchApi(`/api/services/${id}`, { method: 'DELETE' });
       if (res.ok) {
         setServices((current) => current.filter(s => s.id !== id));
         showToast('Servis berhasil dihapus');
-        setDeleteTarget(null); // Tutup modal setelah berhasil
+        setDeleteTarget(null);
       }
     } catch {
       showToast('Gagal menghapus servis');
@@ -210,7 +209,8 @@ export default function StockPage({
           <div className="stock-toolbar">
             <div className="stock-search">
               <Search size={18} />
-              <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari kode atau nama sparepart…" />
+              {/* Perbaikan: Menambahkan id dan name pada input pencarian */}
+              <input id="stock-search" name="stock-search" value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Cari kode atau nama sparepart…" />
             </div>
             <div className="stock-filter-chips" role="group" aria-label="Filter stok">
               {filters.map((f) => (
@@ -277,7 +277,6 @@ export default function StockPage({
                   <span className="right tabular-nums">{formatRupiah(service.price)}</span>
                   <span className="right stock-row-actions">
                     <button className="stock-action-btn edit" onClick={() => { setEditingService(service); setShowServiceModal(true); }}><Edit3 size={14} /> Edit</button>
-                    {/* ✅ DIUBAH: Memanggil setDeleteTarget untuk membuka modal custom */}
                     <button className="stock-action-btn" style={{ color: 'var(--danger)' }} onClick={() => setDeleteTarget(service)}><Trash2 size={14} /></button>
                   </span>
                 </div>
@@ -297,7 +296,6 @@ export default function StockPage({
         <ServiceModal service={editingService} saving={saving} onClose={() => setShowServiceModal(false)} onSave={saveService} />
       )}
       
-      {/* ✅ DITAMBAH: Render Modal Konfirmasi jika ada target hapus */}
       {deleteTarget && (
         <ConfirmDeleteModal
           service={deleteTarget}
@@ -325,8 +323,9 @@ function ServiceModal({ service, saving, onClose, onSave }: { service: Service |
           <button className="close-button" onClick={onClose}><X size={20} /></button>
         </div>
         <div className="settings-modal-body" style={{ display: 'flex', flexDirection: 'column' }}>
-          <label className="settings-form-field"><span>Nama Layanan / Jasa *</span><input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Contoh: Servis CVT" /></label>
-          <label className="settings-form-field"><span>Harga Jasa (Rp) *</span><input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9]/g, ''))} placeholder="0" inputMode="numeric" /></label>
+          {/* Perbaikan: Menambahkan id dan name pada input */}
+          <label className="settings-form-field"><span>Nama Layanan / Jasa *</span><input id="service-name" name="service-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Contoh: Servis CVT" /></label>
+          <label className="settings-form-field"><span>Harga Jasa (Rp) *</span><input id="service-price" name="service-price" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9]/g, ''))} placeholder="0" inputMode="numeric" /></label>
         </div>
         <div className="dialog-footer">
           <button className="secondary-button" onClick={onClose} disabled={saving}>Batal</button>
@@ -358,12 +357,13 @@ function PartModal({ part, newCode, categories, saving, onClose, onSave }: { par
           <button className="close-button" onClick={onClose}><X size={20} /></button>
         </div>
         <div className="settings-modal-body stock-modal-body">
-          <label className="settings-form-field"><span>Kode sparepart *</span><input value={code} onChange={(e) => setCode(e.target.value)} placeholder="SP-001" /></label>
-          <label className="settings-form-field"><span>Nama sparepart *</span><input autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Contoh: V-Belt Honda Beat" /></label>
-          <label className="settings-form-field"><span>Kategori</span><div className="select-wrap"><select value={category} onChange={(e) => setCategory(e.target.value)}>{categories.map((c) => <option key={c} value={c}>{c}</option>)}</select></div></label>
-          <label className="settings-form-field"><span>Harga jual (Rp) *</span><input value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9]/g, ''))} placeholder="0" inputMode="numeric" /></label>
-          <label className="settings-form-field"><span>{part ? 'Stok saat ini' : 'Stok awal'}</span><input value={stock} onChange={(e) => setStock(e.target.value.replace(/[^0-9]/g, ''))} placeholder="0" inputMode="numeric" /></label>
-          <label className="settings-form-field"><span>Stok minimum *</span><input value={minStock} onChange={(e) => setMinStock(e.target.value.replace(/[^0-9]/g, ''))} placeholder="0" inputMode="numeric" /></label>
+          {/* Perbaikan: Menambahkan id dan name pada input/select */}
+          <label className="settings-form-field"><span>Kode sparepart *</span><input id="part-code" name="part-code" value={code} onChange={(e) => setCode(e.target.value)} placeholder="SP-001" /></label>
+          <label className="settings-form-field"><span>Nama sparepart *</span><input id="part-name" name="part-name" autoFocus value={name} onChange={(e) => setName(e.target.value)} placeholder="Contoh: V-Belt Honda Beat" /></label>
+          <label className="settings-form-field"><span>Kategori</span><div className="select-wrap"><select id="part-category" name="part-category" value={category} onChange={(e) => setCategory(e.target.value)}>{categories.map((c) => <option key={c} value={c}>{c}</option>)}</select></div></label>
+          <label className="settings-form-field"><span>Harga jual (Rp) *</span><input id="part-price" name="part-price" value={price} onChange={(e) => setPrice(e.target.value.replace(/[^0-9]/g, ''))} placeholder="0" inputMode="numeric" /></label>
+          <label className="settings-form-field"><span>{part ? 'Stok saat ini' : 'Stok awal'}</span><input id="part-stock" name="part-stock" value={stock} onChange={(e) => setStock(e.target.value.replace(/[^0-9]/g, ''))} placeholder="0" inputMode="numeric" /></label>
+          <label className="settings-form-field"><span>Stok minimum *</span><input id="part-min-stock" name="part-min-stock" value={minStock} onChange={(e) => setMinStock(e.target.value.replace(/[^0-9]/g, ''))} placeholder="0" inputMode="numeric" /></label>
         </div>
         <div className="dialog-footer">
           <button className="secondary-button" onClick={onClose} disabled={saving}>Batal</button>
@@ -390,8 +390,9 @@ function RestockModal({ part, saving, onClose, onSave }: { part: Sparepart; savi
           <button className="close-button" onClick={onClose}><X size={20} /></button>
         </div>
         <div className="settings-modal-body">
-          <label className="settings-form-field"><span>Jumlah masuk (pcs) *</span><input autoFocus value={qty} onChange={(e) => setQty(e.target.value.replace(/[^0-9]/g, ''))} placeholder="0" inputMode="numeric" /></label>
-          <label className="settings-form-field"><span>Catatan</span><input value={note} onChange={(e) => setNote(e.target.value)} placeholder="Contoh: Beli dari Toko Jaya" /></label>
+          {/* Perbaikan: Menambahkan id dan name pada input */}
+          <label className="settings-form-field"><span>Jumlah masuk (pcs) *</span><input id="restock-qty" name="restock-qty" autoFocus value={qty} onChange={(e) => setQty(e.target.value.replace(/[^0-9]/g, ''))} placeholder="0" inputMode="numeric" /></label>
+          <label className="settings-form-field"><span>Catatan</span><input id="restock-note" name="restock-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Contoh: Beli dari Toko Jaya" /></label>
         </div>
         <div className="dialog-footer">
           <button className="secondary-button" onClick={onClose} disabled={saving}>Batal</button>
@@ -403,7 +404,7 @@ function RestockModal({ part, saving, onClose, onSave }: { part: Sparepart; savi
 }
 
 // =========================================================
-// ✅ MODAL BARU: KONFIRMASI HAPUS SERVIS
+// MODAL: KONFIRMASI HAPUS SERVIS
 // =========================================================
 function ConfirmDeleteModal({ service, onClose, onConfirm }: { service: Service; onClose: () => void; onConfirm: () => void }) {
   return (
