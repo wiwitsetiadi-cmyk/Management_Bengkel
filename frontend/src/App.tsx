@@ -2,7 +2,7 @@ import { useEffect, useMemo, useState } from 'react';
 import TrackingPage from './components/TrackingPage';
 import SettingsPage from './components/SettingsPage';
 import ReportsPage from './components/ReportsPage';
-import StockPage from './components/StockPage'; // ❌ DIHAPUS: , { getStockAlerts }
+import StockPage from './components/StockPage';
 
 import AdminLogin from './components/AdminLogin';
 import type { AuthUser } from './components/AdminLogin';
@@ -20,7 +20,6 @@ import {
   CreditCard, LayoutDashboard, Package, PanelLeft, Plus, Search, Settings, Wrench, X,
 } from 'lucide-react';
 
-// ✅ DIUBAH: Import getStockAlerts dari ./data, bukan dari StockPage
 import { allowedTransitions, columns, getStockAlerts } from './data';
 import type {
   Order, CartItem, CashierSelection, CashierLine, OrderMode, OrderStatus,
@@ -47,7 +46,6 @@ function App() {
     try { return JSON.parse(stored) as AuthUser; } catch { return null; }
   });
 
-  // === UI STATE (Hanya untuk tampilan) ===
   const [toast, setToast] = useState<string | null>(null);
   const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
@@ -74,13 +72,11 @@ function App() {
   const [searchFocused, setSearchFocused] = useState(false);
   const [trackingCode, setTrackingCode] = useState<string | null>(trackingMatch ? trackingMatch[1] : null);
 
-  // === TOAST HANDLER ===
   const showToast = (message: string) => {
     setToast(message);
     window.setTimeout(() => setToast(null), 3400);
   };
 
-  // === DATA STATE (Diambil dari Custom Hook) ===
   const { 
     orders, setOrders, 
     parts, setParts, 
@@ -93,11 +89,24 @@ function App() {
   const stockAlerts = useMemo(() => getStockAlerts(parts), [parts]);
 
   const handleLogin = (user: AuthUser) => setAuthUser(user);
+  
   const handleLogout = () => {
     localStorage.removeItem('bengkel_token');
     localStorage.removeItem('bengkel_user');
     setAuthUser(null);
   };
+
+  // Menangkap event 401 dari api.ts untuk logout bersih tanpa reload halaman
+  useEffect(() => {
+    const handleSessionExpired = () => {
+      // Menyimpan pesan agar bisa dibaca oleh komponen AdminLogin
+      sessionStorage.setItem('bengkel_session_msg', 'Sesi Anda telah berakhir. Silakan login kembali.');
+      setAuthUser(null); // Memicu React merender halaman login secara natural
+    };
+
+    window.addEventListener('auth:expired', handleSessionExpired);
+    return () => window.removeEventListener('auth:expired', handleSessionExpired);
+  }, []);
 
   useEffect(() => {
     if (authUser) fetchData();
@@ -251,7 +260,7 @@ function App() {
       setOrderDialogOpen(false);
       setTicketPreview(newOrder);
       setServiceForm({ vehicle: '', plate: '', customer: '', phone: '', issue: '', serviceType: '', mechanicId: '' });
-    } catch { // ✅ DIUBAH: Menghapus parameter error yang tidak terpakai
+    } catch {
       showToast('Gagal menyimpan pesanan ke database');
     }
   };
