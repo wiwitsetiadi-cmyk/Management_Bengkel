@@ -98,8 +98,16 @@ export default function OrderDrawer({
     setItemSparepartId(null);
   };
 
+  // ✅ DIUBAH: Menghindari destructuring variabel yang tidak dipakai (fix warning no-unused-vars)
   const getAdditionalItemsPayload = (): AdditionalItemPayload[] => {
-    return additionalItems.map(({ additional, locked, stock, ...item }) => item);
+    return additionalItems.map((item) => ({
+      id: item.id,
+      name: item.name,
+      type: item.type,
+      qty: item.qty,
+      price: item.price,
+      sparepartId: item.sparepartId,
+    }));
   };
 
   const removeDetailItem = (itemId: string) => {
@@ -186,15 +194,12 @@ export default function OrderDrawer({
           <div className="grand-total"><span>Total baru</span><strong>{formatRupiah(newTotal)}</strong></div>
         </div>
         
-        {/* FOOTER: Logika Fleksibel untuk Admin */}
         <div className="drawer-footer drawer-footer-sticky" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          
           {order.status === 'QUEUE' && (
             <button className="primary-button full-width" onClick={() => onStatusChange('WORKING', [])}>
               Mulai Dikerjakan <ChevronRight size={15} />
             </button>
           )}
-
           {order.status === 'WORKING' && additionalItems.length > 0 && (
             <>
               <button className="primary-button full-width" onClick={() => onStatusChange('READY', getAdditionalItemsPayload())}>
@@ -205,19 +210,16 @@ export default function OrderDrawer({
               </button>
             </>
           )}
-
           {order.status === 'WORKING' && additionalItems.length === 0 && (
             <button className="primary-button full-width" onClick={() => onStatusChange('READY', [])}>
               Selesai & Siap Bayar <ChevronRight size={15} />
             </button>
           )}
-
           {order.status === 'APPROVAL' && (
             <button className="primary-button full-width" onClick={() => onStatusChange('READY', order.items.filter(i => i.isAdditional))}>
               Lanjut ke Siap Bayar <ChevronRight size={15} />
             </button>
           )}
-
         </div>
       </aside>
     </div>
