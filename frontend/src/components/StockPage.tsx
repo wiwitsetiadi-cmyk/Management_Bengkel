@@ -1,11 +1,8 @@
 import { useMemo, useState } from 'react';
 import { AlertTriangle, Check, Edit3, Package, Plus, Search, X, Wrench, Trash2 } from 'lucide-react';
-// ✅ DIUBAH: Menambahkan formatRupiah ke dalam import dari ../data
 import { getStockAlerts, getStockStatus, formatRupiah } from '../data';
 import type { Sparepart, Service } from '../data';
 import { fetchApi } from '../api';
-
-// ❌ DIHAPUS: type StockStatus, getStockStatus, getStockAlerts, dan formatRupiah lokal
 
 const categories = ['CVT', 'Oli & Cairan', 'Rem', 'Ignition', 'Ban', 'Rantai', 'Filter', 'Lainnya'];
 
@@ -45,6 +42,9 @@ export default function StockPage({
   // === STATE SERVICE ===
   const [showServiceModal, setShowServiceModal] = useState(false);
   const [editingService, setEditingService] = useState<Service | null>(null);
+  
+  // ✅ DITAMBAH: State untuk target hapus (menggantikan confirm bawaan browser)
+  const [deleteTarget, setDeleteTarget] = useState<Service | null>(null);
 
   const [saving, setSaving] = useState(false);
 
@@ -150,15 +150,18 @@ export default function StockPage({
     }
   };
 
-  const deleteService = async (id: string) => {
-    if (!confirm('Hapus katalog servis ini?')) return;
+  // ✅ DIUBAH: Menghapus confirm() bawaan browser, sekarang dieksekusi dari Modal
+  const executeDeleteService = async (id: string) => {
     try {
       const res = await fetchApi(`/api/services/${id}`, { method: 'DELETE' });
       if (res.ok) {
         setServices((current) => current.filter(s => s.id !== id));
-        showToast('Servis dihapus');
+        showToast('Servis berhasil dihapus');
+        setDeleteTarget(null); // Tutup modal setelah berhasil
       }
-    } catch {}
+    } catch {
+      showToast('Gagal menghapus servis');
+    }
   };
 
   const filterToLow = () => {
@@ -274,7 +277,8 @@ export default function StockPage({
                   <span className="right tabular-nums">{formatRupiah(service.price)}</span>
                   <span className="right stock-row-actions">
                     <button className="stock-action-btn edit" onClick={() => { setEditingService(service); setShowServiceModal(true); }}><Edit3 size={14} /> Edit</button>
-                    <button className="stock-action-btn" style={{ color: 'var(--danger)' }} onClick={() => deleteService(service.id)}><Trash2 size={14} /></button>
+                    {/* ✅ DIUBAH: Memanggil setDeleteTarget untuk membuka modal custom */}
+                    <button className="stock-action-btn" style={{ color: 'var(--danger)' }} onClick={() => setDeleteTarget(service)}><Trash2 size={14} /></button>
                   </span>
                 </div>
               ))}
@@ -291,6 +295,15 @@ export default function StockPage({
       )}
       {showServiceModal && (
         <ServiceModal service={editingService} saving={saving} onClose={() => setShowServiceModal(false)} onSave={saveService} />
+      )}
+      
+      {/* ✅ DITAMBAH: Render Modal Konfirmasi jika ada target hapus */}
+      {deleteTarget && (
+        <ConfirmDeleteModal
+          service={deleteTarget}
+          onClose={() => setDeleteTarget(null)}
+          onConfirm={() => executeDeleteService(deleteTarget.id)}
+        />
       )}
     </div>
   );
@@ -385,6 +398,32 @@ function RestockModal({ part, saving, onClose, onSave }: { part: Sparepart; savi
           <button className="primary-button" disabled={!canSave} onClick={() => onSave(part, Number(qty), note)}><Check size={16} /> Tambah Stok</button>
         </div>
       </section>
+    </div>
+  );
+}
+
+// =========================================================
+// ✅ MODAL BARU: KONFIRMASI HAPUS SERVIS
+// =========================================================
+function ConfirmDeleteModal({ service, onClose, onConfirm }: { service: Service; onClose: () => void; onConfirm: () => void }) {
+  return (
+    <div className="modal-backdrop confirmation-backdrop" onClick={onClose}>
+      <div className="payment-confirm-modal" onClick={(e) => e.stopPropagation()}>
+        <div className="confirm-icon" style={{ color: 'var(--danger)', backgroundColor: '#fbe5e5' }}>
+          <Trash2 size={22} />
+        </div>
+        <h2>Hapus Katalog Servis?</h2>
+        <p>
+          Layanan <strong>"{service.name}"</strong> akan dihapus permanen dari sistem.<br />
+          Tindakan ini tidak dapat dibatalkan.
+        </p>
+        <div>
+          <button className="secondary-button" onClick={onClose}>Batal</button>
+          <button className="primary-button" style={{ backgroundColor: 'var(--danger)' }} onClick={onConfirm}>
+            Ya, Hapus
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
