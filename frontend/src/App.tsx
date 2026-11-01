@@ -21,9 +21,12 @@ import {
 } from 'lucide-react';
 
 import { allowedTransitions, columns } from './data';
-import type { Order, CartItem, CashierSelection, CashierLine, OrderMode, OrderStatus } from './data';
+import type {
+  Order, CartItem, CashierSelection, CashierLine, OrderMode, OrderStatus,
+  Sparepart, AdditionalItemPayload,
+} from './data';
 import { fetchApi } from './api';
-import { useData } from './hooks/useData'; // <-- Import Custom Hook
+import { useData } from './hooks/useData';
 
 const navItems = [
   { label: 'Dasbor', icon: LayoutDashboard },
@@ -161,7 +164,7 @@ function App() {
     setDraggedId(null);
   };
 
-  const updateSelectedStatus = async (status: OrderStatus, additionalItems?: any[]) => {
+  const updateSelectedStatus = async (status: OrderStatus, additionalItems?: AdditionalItemPayload[]) => {
     if (!selectedOrder) return;
     
     try {
@@ -200,7 +203,7 @@ function App() {
   const filteredParts = parts.filter((part) => part.name.toLowerCase().includes(partSearch.toLowerCase()));
   const cartTotal = cart.reduce((total, item) => total + item.price * item.qty, 0);
 
-  const addPart = (part: any) => {
+  const addPart = (part: Sparepart) => {
     setCart((current) => {
       const existing = current.find((item) => item.id === part.id);
       if (existing) return current.map((item) => (item.id === part.id ? { ...item, qty: Math.min(item.qty + 1, item.stock) } : item));
@@ -311,8 +314,8 @@ function App() {
       setCashierSelection(null);
       setFinalReceipt(selection);
       setCart([]);
-    } catch (error: any) {
-      showToast(error.message || 'Terjadi kesalahan saat menyimpan transaksi');
+    } catch (error) {
+      showToast(error instanceof Error ? error.message : 'Terjadi kesalahan saat menyimpan transaksi');
     }
   };
 
