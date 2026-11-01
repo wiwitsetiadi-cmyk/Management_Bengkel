@@ -14,6 +14,10 @@ function ReceiptLine({ line }: { line: CashierLine }) {
 
 export default function FinalReceipt({ selection, onClose, onNewTransaction }: { selection: CashierSelection; onClose: () => void; onNewTransaction: () => void }) {
   const [paperWidth, setPaperWidth] = useState<'58' | '80'>('80');
+  
+  // ✅ DIUBAH: Bekukan waktu saat komponen pertama kali dirender (mengatasi warning purity)
+  const [receiptDate] = useState(() => new Date());
+
   const mechanicLabel = selection.mode === 'parts' || !selection.order?.mechanic ? 'Mekanik: -' : `Mekanik: ${selection.order.mechanic.code} · ${selection.order.mechanic.name}`;
   const subtotal = selection.lines.reduce((sum, line) => sum + line.price * line.qty, 0);
   const paid = selection.payments?.reduce((sum, p) => sum + p.amount, 0) || selection.total;
@@ -48,7 +52,10 @@ export default function FinalReceipt({ selection, onClose, onNewTransaction }: {
             <div className="receipt-order-title receipt-final-title"><span>BUKTI PEMBAYARAN</span><em className="lunas-stamp">LUNAS</em></div>
             <div className="receipt-lines">
               <div><span>No. Pesanan</span><strong>{selection.order?.id.slice(-8).toUpperCase() || '-'}</strong></div>
-              <div><span>Tanggal</span><strong>{new Date().toLocaleDateString('id-ID')} · {new Date().toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</strong></div>
+              
+              {/* ✅ DIUBAH: Menggunakan receiptDate, bukan new Date() langsung */}
+              <div><span>Tanggal</span><strong>{receiptDate.toLocaleDateString('id-ID')} · {receiptDate.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' })}</strong></div>
+              
               <div><span>Kasir</span><strong>Admin</strong></div>
               <div><span>Model</span><strong>{selection.order?.vehicle}</strong></div>
               <div><span>Plat</span><strong>{selection.order?.plate || '-'}</strong></div>
