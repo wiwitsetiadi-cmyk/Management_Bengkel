@@ -22,7 +22,7 @@ export type NewOrderDialogProps = {
   cart: CartItem[];
   cartTotal: number;
   mechanics: Mechanic[];
-  services: Service[]; // <-- PROP BARU
+  services: Service[];
   onClose: () => void;
   onModeChange: (mode: OrderMode) => void;
   onFieldChange: (field: keyof NewOrderDialogProps['serviceForm'], value: string) => void;
@@ -44,7 +44,7 @@ export default function NewOrderDialog({
   cart, 
   cartTotal, 
   mechanics, 
-  services, // <-- TERIMA PROP BARU
+  services,
   onClose, 
   onModeChange, 
   onFieldChange, 
@@ -82,15 +82,20 @@ export default function NewOrderDialog({
         {mode === 'service' ? (
           <div className="dialog-form fade-in">
             <div className="form-grid">
-              <Field label="Model kendaraan" required><input autoFocus value={serviceForm.vehicle} onChange={(event) => onFieldChange('vehicle', event.target.value)} placeholder="Contoh: Honda Beat" /></Field>
-              <Field label="Plat nomor" hint="Opsional"><input value={serviceForm.plate} onChange={(event) => onFieldChange('plate', event.target.value)} placeholder="B 1234 XYZ" /></Field>
+              {/* Perbaikan: Menambahkan id dan name pada input */}
+              <Field label="Model kendaraan" required>
+                <input id="order-vehicle" name="vehicle" autoFocus value={serviceForm.vehicle} onChange={(event) => onFieldChange('vehicle', event.target.value)} placeholder="Contoh: Honda Beat" />
+              </Field>
+              <Field label="Plat nomor" hint="Opsional">
+                <input id="order-plate" name="plate" value={serviceForm.plate} onChange={(event) => onFieldChange('plate', event.target.value)} placeholder="B 1234 XYZ" />
+              </Field>
             </div>
             
             <Field label="Jenis keluhan / servis" required>
               <div className="select-wrap">
-                <select value={serviceForm.serviceType} onChange={(event) => onFieldChange('serviceType', event.target.value)}>
+                {/* Perbaikan: Menambahkan id dan name pada select */}
+                <select id="order-service-type" name="serviceType" value={serviceForm.serviceType} onChange={(event) => onFieldChange('serviceType', event.target.value)}>
                   <option value="">Pilih jenis servis</option>
-                  {/* PERBAIKAN: Looping data servis dari database */}
                   {services.map((service) => (
                     <option key={service.id} value={service.id}>
                       {service.name} ({formatRupiah(service.price)})
@@ -103,7 +108,8 @@ export default function NewOrderDialog({
             
             <Field label="Mekanik" required error={mechanicError} errorText="Pilih mekanik">
               <div className="select-wrap">
-                <select value={serviceForm.mechanicId} onChange={(event) => onFieldChange('mechanicId', event.target.value)} onBlur={onMechanicBlur}>
+                {/* Perbaikan: Menambahkan id dan name pada select */}
+                <select id="order-mechanic" name="mechanicId" value={serviceForm.mechanicId} onChange={(event) => onFieldChange('mechanicId', event.target.value)} onBlur={onMechanicBlur}>
                   <option value="">Pilih mekanik aktif</option>
                   {activeMechanics.map((mechanic) => <option key={mechanic.id} value={mechanic.id}>{mechanic.code} · {mechanic.name}</option>)}
                 </select>
@@ -115,7 +121,8 @@ export default function NewOrderDialog({
           <div className="parts-form fade-in">
             <div className="part-search-wrap">
               <Search size={18} />
-              <input autoFocus value={partSearch} onChange={(event) => onPartSearch(event.target.value)} placeholder="Cari nama sparepart…" />
+              {/* Perbaikan: Menambahkan id dan name pada input pencarian */}
+              <input id="part-search" name="part-search" autoFocus value={partSearch} onChange={(event) => onPartSearch(event.target.value)} placeholder="Cari nama sparepart…" />
             </div>
             {partSearch && (
               <div className="part-results">
