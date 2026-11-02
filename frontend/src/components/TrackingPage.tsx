@@ -2,7 +2,8 @@ import { useEffect, useState } from 'react';
 import { AlertCircle, Bike, Check, Clock3, MessageCircle, ShieldCheck, Wrench, X } from 'lucide-react';
 import type { Order } from '../data';
 
-const API_BASE = 'http://localhost:3000';
+// Perubahan: Menggunakan Environment Variable untuk URL API
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 const steps = [
   { id: 'QUEUE', label: 'Antrean' },
@@ -26,7 +27,6 @@ export default function TrackingPage({ code, onApprove }: { code: string; onAppr
   const [decisionMessage, setDecisionMessage] = useState('');
 
   useEffect(() => {
-    // Fetch data berdasarkan trackingToken (code)
     fetch(`${API_BASE}/api/tracking/${code}`)
       .then(res => res.ok ? res.json() : Promise.reject())
       .then(data => setOrder(data))
