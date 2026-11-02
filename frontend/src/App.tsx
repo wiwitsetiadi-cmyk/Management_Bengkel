@@ -70,6 +70,10 @@ function App() {
   const [bellOpen, setBellOpen] = useState(false);
   const [orderSearch, setOrderSearch] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
+  
+  // State tambahan untuk mobile search
+  const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
+  
   const [trackingCode, setTrackingCode] = useState<string | null>(trackingMatch ? trackingMatch[1] : null);
 
   const showToast = useCallback((message: string) => {
@@ -140,6 +144,7 @@ function App() {
     setSelectedOrder(order);
     setOrderSearch('');
     setSearchFocused(false);
+    setMobileSearchOpen(false); // Tutup mobile search
   };
 
   const moveOrder = async (orderId: string, status: OrderStatus) => {
@@ -364,14 +369,20 @@ function App() {
           <span className="topbar-divider" />
           <span className="page-label">{activeView === 'cashier' ? 'Kasir' : activeView === 'settings' ? 'Pengaturan' : activeView === 'reports' ? 'Laporan' : activeView === 'stock' ? 'Stok & Katalog' : 'Dasbor Operasional'}</span>
         </div>
-        <div className="global-search">
+        
+        {/* Global Search Desktop & Mobile Overlay */}
+        <div className={`global-search ${mobileSearchOpen ? 'mobile-visible' : ''}`}>
           <Search size={19} />
-          {/* Perbaikan: Menambahkan id dan name pada input pencarian */}
-          <input id="global-search" name="global-search" aria-label="Cari" value={orderSearch} onChange={(event) => setOrderSearch(event.target.value)} onFocus={() => setSearchFocused(true)} onKeyDown={(event) => { if (event.key === 'Escape') { setOrderSearch(''); setSearchFocused(false); } if (event.key === 'Enter' && searchResults[0]) openSearchResult(searchResults[0]); }} placeholder="Cari No. Pesanan / plat…" />
+          <input id="global-search" name="global-search" aria-label="Cari" value={orderSearch} onChange={(event) => setOrderSearch(event.target.value)} onFocus={() => setSearchFocused(true)} onKeyDown={(event) => { if (event.key === 'Escape') { setOrderSearch(''); setSearchFocused(false); setMobileSearchOpen(false); } if (event.key === 'Enter' && searchResults[0]) openSearchResult(searchResults[0]); }} placeholder="Cari No. Pesanan / plat…" />
           {orderSearch && <button className="search-clear" onClick={() => setOrderSearch('')}><X size={15} /></button>}
+          {mobileSearchOpen && <button className="search-clear" onClick={() => setMobileSearchOpen(false)}><X size={20} /></button>}
           {searchFocused && orderSearch.trim() && <div className="search-results">{searchResults.length ? searchResults.map((order) => <button key={order.id} className="search-result" onClick={() => openSearchResult(order)}><span><strong>{order.vehicle}</strong><small>{order.plate || 'Tanpa plat'}</small></span><ChevronRight size={15} /></button>) : <div className="search-no-result">Tidak ditemukan</div>}</div>}
         </div>
+
         <div className="topbar-actions">
+          <button className="icon-button mobile-search-toggle" onClick={() => setMobileSearchOpen(!mobileSearchOpen)}>
+            <Search size={20} />
+          </button>
           <button className="icon-button notification-button" onClick={() => setBellOpen((open) => !open)}><Bell size={20} /><span className="notification-dot" /></button>
           {bellOpen && <div className="bell-dropdown fade-in"><div className="bell-dropdown-header"><strong>Notifikasi Stok</strong></div><div className="bell-dropdown-list">{stockAlerts.map((item) => <div key={item.id} className="bell-dropdown-item" onClick={() => { setBellOpen(false); navigateView('stock'); }}><span className={`bell-item-dot ${item.stock === 0 ? 'danger' : 'warning'}`} /><div><strong>{item.name}</strong><small>tersisa {item.stock} pcs</small></div></div>)}</div></div>}
           <button className="admin-profile admin-profile-button" onClick={handleLogout}>
@@ -382,6 +393,9 @@ function App() {
       </header>
 
       <div className={`shell-body ${sidebarOpen ? 'sidebar-visible' : ''}`}>
+        {/* Backdrop gelap saat sidebar terbuka di HP */}
+        {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
+        
         <aside className="sidebar">
           <button className="new-order-button" onClick={openNewOrder}><Plus size={19} strokeWidth={2.5} /> Pesanan Baru</button>
           <nav className="main-nav">
