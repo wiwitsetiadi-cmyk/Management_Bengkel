@@ -8,7 +8,9 @@ dotenv.config();
 
 const app = express();
 const prisma = new PrismaClient();
-const PORT = 3000;
+
+// Perubahan: Menggunakan Environment Variable untuk PORT dengan fallback ke 3000
+const PORT = process.env.PORT || 3000;
 
 // ==========================================
 // 1. KONFIGURASI AUTENTIKASI
@@ -114,7 +116,6 @@ app.post('/api/mechanics', requireAuth, async (req, res) => {
   try {
     const { code, name, initials, color } = req.body;
     
-    // VALIDASI INPUT
     if (!code?.trim() || !name?.trim() || !initials?.trim()) {
       return res.status(400).json({ error: 'Kode, Nama, dan Inisial wajib diisi.' });
     }
@@ -131,7 +132,6 @@ app.put('/api/mechanics/:id', requireAuth, async (req, res) => {
     const id = req.params.id as string;
     const { name, isActive } = req.body;
     
-    // VALIDASI INPUT
     if (!name?.trim()) {
       return res.status(400).json({ error: 'Nama mekanik tidak boleh kosong.' });
     }
@@ -158,7 +158,6 @@ app.post('/api/spareparts', requireAuth, async (req, res) => {
   try {
     const { code, name, category, price, stock, minStock } = req.body;
     
-    // VALIDASI INPUT
     if (!code?.trim() || !name?.trim() || !category?.trim()) {
       return res.status(400).json({ error: 'Kode, Nama, dan Kategori wajib diisi.' });
     }
@@ -187,7 +186,6 @@ app.put('/api/spareparts/:id', requireAuth, async (req, res) => {
     const id = req.params.id as string;
     const { code, name, category, price, stock, minStock } = req.body;
     
-    // VALIDASI INPUT
     if (!code?.trim() || !name?.trim() || !category?.trim()) {
       return res.status(400).json({ error: 'Kode, Nama, dan Kategori wajib diisi.' });
     }
@@ -217,7 +215,6 @@ app.post('/api/spareparts/:id/restock', requireAuth, async (req, res) => {
     const id = req.params.id as string;
     const { qty } = req.body;
     
-    // VALIDASI INPUT
     if (Number(qty) <= 0) {
       return res.status(400).json({ error: 'Jumlah restock harus lebih dari 0.' });
     }
@@ -232,7 +229,7 @@ app.post('/api/spareparts/:id/restock', requireAuth, async (req, res) => {
 });
 
 // ==========================================
-// 5.1 ENDPOINT SERVICE (KATALOG JASA) - BARU
+// 5.1 ENDPOINT SERVICE (KATALOG JASA)
 // ==========================================
 app.get('/api/services', requireAuth, async (req, res) => {
   try {
@@ -247,7 +244,6 @@ app.post('/api/services', requireAuth, async (req, res) => {
   try {
     const { name, price } = req.body;
     
-    // VALIDASI INPUT
     if (!name?.trim()) {
       return res.status(400).json({ error: 'Nama servis wajib diisi.' });
     }
@@ -269,7 +265,6 @@ app.put('/api/services/:id', requireAuth, async (req, res) => {
     const id = req.params.id as string;
     const { name, price } = req.body;
     
-    // VALIDASI INPUT
     if (!name?.trim()) {
       return res.status(400).json({ error: 'Nama servis wajib diisi.' });
     }
@@ -315,7 +310,6 @@ app.post('/api/orders', requireAuth, async (req, res) => {
   try {
     const { vehicle, plate, issue, color, mechanicId, items } = req.body;
     
-    // VALIDASI INPUT
     if (!vehicle?.trim()) {
       return res.status(400).json({ error: 'Model kendaraan wajib diisi.' });
     }
@@ -326,7 +320,6 @@ app.post('/api/orders', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Pesanan minimal harus memiliki 1 item.' });
     }
     
-    // Validasi setiap item
     for (const item of items) {
       if (!item.name?.trim() || Number(item.price) < 0 || Number(item.qty) <= 0) {
         return res.status(400).json({ error: 'Data item tidak valid (nama kosong, harga negatif, atau qty <= 0).' });
@@ -369,7 +362,6 @@ app.put('/api/orders/:id/status', requireAuth, async (req, res) => {
     const id = req.params.id as string;
     const { status: newStatus, additionalItems } = req.body;
 
-    // VALIDASI STATUS
     if (!newStatus || !Object.keys(ALLOWED_TRANSITIONS).includes(newStatus)) {
       return res.status(400).json({ error: 'Status tidak valid.' });
     }
@@ -384,7 +376,6 @@ app.put('/api/orders/:id/status', requireAuth, async (req, res) => {
     }
 
     if (currentOrder.status === 'WORKING' && additionalItems?.length > 0) {
-      // Validasi item tambahan
       for (const item of additionalItems) {
         if (!item.name?.trim() || Number(item.price) < 0 || Number(item.qty) <= 0) {
           return res.status(400).json({ error: 'Data item tambahan tidak valid.' });
@@ -473,7 +464,6 @@ app.post('/api/checkout', requireAuth, async (req, res) => {
   try {
     const { orderId, mode, lines } = req.body; 
     
-    // VALIDASI INPUT
     if (!lines || lines.length === 0) {
       return res.status(400).json({ error: 'Rincian pembayaran tidak boleh kosong.' });
     }
@@ -555,7 +545,6 @@ app.put('/api/commission', requireAuth, async (req, res) => {
   try {
     const { servicePercent, partsPercent, overrides } = req.body;
     
-    // VALIDASI INPUT KOMISI
     if (Number(servicePercent) < 0 || Number(servicePercent) > 100 || Number(partsPercent) < 0 || Number(partsPercent) > 100) {
       return res.status(400).json({ error: 'Persentase komisi harus di antara 0 dan 100.' });
     }
