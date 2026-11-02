@@ -1,5 +1,7 @@
 // src/api.ts
-const API_BASE = 'http://localhost:3000';
+
+// Perubahan: Menggunakan Environment Variable untuk URL API
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 export const fetchApi = async (endpoint: string, options: RequestInit = {}) => {
   const token = localStorage.getItem('bengkel_token');
@@ -16,11 +18,9 @@ export const fetchApi = async (endpoint: string, options: RequestInit = {}) => {
   });
 
   if (response.status === 401) {
-    // Menghapus token yang sudah tidak valid
     localStorage.removeItem('bengkel_token');
     localStorage.removeItem('bengkel_user');
     
-    // Mengirim event kustom agar ditangkap oleh komponen App tanpa melakukan reload halaman
     window.dispatchEvent(new CustomEvent('auth:expired'));
     
     throw new Error('Sesi habis, silakan login ulang');
