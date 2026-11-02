@@ -7,7 +7,8 @@ import loginWorkshop from '../assets/login-workshop.png';
 
 export type AuthUser = { email: string; name: string };
 
-const API_BASE = 'http://localhost:3000';
+// Perubahan: Menggunakan Environment Variable untuk URL API
+const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 export default function AdminLogin({ onLogin }: { onLogin: (user: AuthUser) => void }) {
   const [email, setEmail] = useState('');
@@ -106,7 +107,6 @@ export default function AdminLogin({ onLogin }: { onLogin: (user: AuthUser) => v
           <form className="admin-login-form" onSubmit={submitLogin}>
             <label className="admin-login-field" htmlFor="admin-email">
               <span>Email</span>
-              {/* Perbaikan: Menambahkan id dan name pada input email */}
               <input
                 id="admin-email"
                 name="email"
@@ -122,7 +122,6 @@ export default function AdminLogin({ onLogin }: { onLogin: (user: AuthUser) => v
             <label className="admin-login-field" htmlFor="admin-password">
               <span>Kata sandi</span>
               <div className="admin-password-input">
-                {/* Perbaikan: Menambahkan id dan name pada input password */}
                 <input
                   id="admin-password"
                   name="password"
@@ -144,7 +143,6 @@ export default function AdminLogin({ onLogin }: { onLogin: (user: AuthUser) => v
               </div>
             </label>
             <div className="admin-login-options">
-              {/* Perbaikan: Menambahkan id dan name pada input checkbox */}
               <label htmlFor="remember-me">
                 <input id="remember-me" name="remember-me" type="checkbox" /> 
                 <span>Ingat saya</span>
