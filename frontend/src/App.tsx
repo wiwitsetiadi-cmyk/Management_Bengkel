@@ -71,7 +71,7 @@ function App() {
   const [orderSearch, setOrderSearch] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
   
-  // State tambahan untuk mobile search
+  // Mobile Search Overlay State
   const [mobileSearchOpen, setMobileSearchOpen] = useState(false);
   
   const [trackingCode, setTrackingCode] = useState<string | null>(trackingMatch ? trackingMatch[1] : null);
@@ -144,7 +144,7 @@ function App() {
     setSelectedOrder(order);
     setOrderSearch('');
     setSearchFocused(false);
-    setMobileSearchOpen(false); // Tutup mobile search
+    setMobileSearchOpen(false);
   };
 
   const moveOrder = async (orderId: string, status: OrderStatus) => {
@@ -271,7 +271,7 @@ function App() {
   const navigateView = (view: 'dashboard' | 'cashier' | 'settings' | 'reports' | 'stock') => {
     window.history.pushState({}, '', view === 'cashier' ? '/kasir' : view === 'settings' ? '/pengaturan' : view === 'reports' ? '/laporan' : view === 'stock' ? '/stok' : '/dasbor');
     setActiveView(view);
-    setSidebarOpen(false);
+    setSidebarOpen(false); // Tutup sidebar saat navigasi
   };
 
   const openCashierForOrder = (order: Order) => {
@@ -370,7 +370,7 @@ function App() {
           <span className="page-label">{activeView === 'cashier' ? 'Kasir' : activeView === 'settings' ? 'Pengaturan' : activeView === 'reports' ? 'Laporan' : activeView === 'stock' ? 'Stok & Katalog' : 'Dasbor Operasional'}</span>
         </div>
         
-        {/* Global Search Desktop & Mobile Overlay */}
+        {/* Global Search Desktop & Mobile */}
         <div className={`global-search ${mobileSearchOpen ? 'mobile-visible' : ''}`}>
           <Search size={19} />
           <input id="global-search" name="global-search" aria-label="Cari" value={orderSearch} onChange={(event) => setOrderSearch(event.target.value)} onFocus={() => setSearchFocused(true)} onKeyDown={(event) => { if (event.key === 'Escape') { setOrderSearch(''); setSearchFocused(false); setMobileSearchOpen(false); } if (event.key === 'Enter' && searchResults[0]) openSearchResult(searchResults[0]); }} placeholder="Cari No. Pesanan / plat…" />
@@ -380,7 +380,7 @@ function App() {
         </div>
 
         <div className="topbar-actions">
-          <button className="icon-button mobile-search-toggle" onClick={() => setMobileSearchOpen(!mobileSearchOpen)}>
+          <button className="icon-button mobile-search-btn" onClick={() => setMobileSearchOpen(!mobileSearchOpen)}>
             <Search size={20} />
           </button>
           <button className="icon-button notification-button" onClick={() => setBellOpen((open) => !open)}><Bell size={20} /><span className="notification-dot" /></button>
@@ -393,7 +393,6 @@ function App() {
       </header>
 
       <div className={`shell-body ${sidebarOpen ? 'sidebar-visible' : ''}`}>
-        {/* Backdrop gelap saat sidebar terbuka di HP */}
         {sidebarOpen && <div className="sidebar-backdrop" onClick={() => setSidebarOpen(false)} />}
         
         <aside className="sidebar">
