@@ -2,7 +2,6 @@ import { useEffect, useState } from 'react';
 import { AlertCircle, Bike, Check, Clock3, MessageCircle, ShieldCheck, Wrench, X } from 'lucide-react';
 import type { Order } from '../data';
 
-// Perubahan: Menggunakan Environment Variable untuk URL API
 const API_BASE = import.meta.env.VITE_API_URL || 'http://localhost:3000';
 
 const steps = [
@@ -17,6 +16,7 @@ const statusMessages: Record<string, string> = {
   WORKING: 'Mekanik kami sedang mengerjakan kendaraan Anda.',
   APPROVAL: 'Mekanik menemukan kebutuhan tambahan pada kendaraan Anda.',
   READY: 'Servis selesai! Silakan menuju kasir untuk melakukan pembayaran.',
+  PAID: 'Pembayaran telah lunas. Terima kasih!',
 };
 
 const formatCurrency = (amount: number) => `Rp ${new Intl.NumberFormat('id-ID').format(amount)}`;
@@ -27,11 +27,23 @@ export default function TrackingPage({ code, onApprove }: { code: string; onAppr
   const [decisionMessage, setDecisionMessage] = useState('');
 
   useEffect(() => {
-    fetch(`${API_BASE}/api/tracking/${code}`)
-      .then(res => res.ok ? res.json() : Promise.reject())
-      .then(data => setOrder(data))
-      .catch(() => setOrder(null))
-      .finally(() => setLoading(false));
+    let isMounted = true;
+
+    const fetchOrder = () => {
+      fetch(`${API_BASE}/api/tracking/${code}`)
+        .then(res => res.ok ? res.json() : Promise.reject())
+        .then(data => { if (isMounted) setOrder(data); })
+        .catch(() => { if (isMounted) setOrder(null); })
+        .finally(() => { if (isMounted) setLoading(false); });
+    };
+
+    fetchOrder();
+    const interval = setInterval(fetchOrder, 10000); // Perbaikan: Polling setiap 10 detik
+
+    return () => {
+      isMounted = false;
+      clearInterval(interval);
+    };
   }, [code]);
 
   if (loading) return <div style={{ textAlign: 'center', padding: 50 }}>Memuat data...</div>;
@@ -41,9 +53,25 @@ export default function TrackingPage({ code, onApprove }: { code: string; onAppr
   const total = order.items.reduce((sum, line) => sum + line.price * line.qty, 0);
   const additionalItems = order.items.filter(i => i.isAdditional);
 
-  const decideExtra = (accepted: boolean) => {
-    onApprove(accepted); 
-    setDecisionMessage(accepted ? 'Persetujuan diterima. Mekanik akan melanjutkan servis.' : 'Biaya tambahan ditolak. Mekanik akan melanjutkan tanpa item tambahan.');
+  const decideExtra = async (accepted: boolean) => {
+    try {
+      const res = await fetch(`${API_BASE}/api/tracking/${code}/approve`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accepted }),
+      });
+      
+      if (res.ok) {
+        const updatedData = await res.json();
+        setOrder(updatedData); // Perbaikan: Update state lokal agar UI langsung berubah
+        onApprove(accepted); 
+        setDecisionMessage(accepted ? 'Persetujuan diterima. Mekanik akan melanjutkan servis.' : 'Biaya tambahan ditolak. Mekanik akan melanjutkan tanpa item tambahan.');
+      } else {
+        setDecisionMessage('Gagal memproses persetujuan. Coba lagi.');
+      }
+    } catch {
+      setDecisionMessage('Tidak dapat terhubung ke server.');
+    }
   };
 
   return <main className="tracking-shell customer-tracking-page">
