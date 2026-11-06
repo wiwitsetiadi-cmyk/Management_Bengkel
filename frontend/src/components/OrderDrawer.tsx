@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { X, Check, FileText, Package, Plus, Trash2, ChevronRight, AlertCircle, CheckCircle } from 'lucide-react';
+import { X, Check, FileText, Package, Plus, Trash2, ChevronRight, AlertCircle } from 'lucide-react'; // CheckCircle dihapus
 import { formatRupiah, columns } from '../data';
 import type { Order, OrderStatus, Sparepart, AdditionalItemPayload } from '../data';
 
@@ -59,7 +59,8 @@ export default function OrderDrawer({
   const baseTotal = items.filter((item) => !item.additional).reduce((total, item) => total + item.price * item.qty, 0);
   const additionalTotal = additionalItems.reduce((total, item) => total + item.price * item.qty, 0);
   const newTotal = baseTotal + additionalTotal;
-  const isLocked = order.status === 'APPROVAL' || order.status === 'READY';
+  
+  const isLocked = order.status === 'APPROVAL' || order.status === 'READY' || order.status === 'PAID';
   const trackingUrl = `${window.location.origin}/tracking/${order.trackingToken}`;
 
   const copyTrackingLink = async () => {
@@ -127,7 +128,7 @@ export default function OrderDrawer({
         
         <div className="drawer-status">
           <span className={`status-dot ${order.status.toLowerCase()}`} />
-          {columns.find((column) => column.id === order.status)?.title}
+          {columns.find((column) => column.id === order.status)?.title || order.status}
         </div>
         
         <div className="order-info-grid">
@@ -164,7 +165,6 @@ export default function OrderDrawer({
           </div>
           <div className="add-item-grid">
             <div className="autocomplete-field">
-              {/* Perbaikan: Menambahkan id dan name */}
               <input id="extra-item-name" name="extra-item-name" disabled={isLocked} value={itemName} onChange={(event) => { setItemName(event.target.value); setItemStock(null); setItemError(''); setItemSparepartId(null); }} placeholder="Nama item / cari stok" />
               {itemName && !isLocked && !itemSparepartId && (
                 <div className="item-suggestions">
@@ -176,7 +176,6 @@ export default function OrderDrawer({
                 </div>
               )}
             </div>
-            {/* Perbaikan: Menambahkan id dan name pada select dan input lainnya */}
             <select id="extra-item-type" name="extra-item-type" disabled={isLocked} value={itemType} onChange={(event) => setItemType(event.target.value as DetailItem['type'])}><option value="SPAREPART">Sparepart</option><option value="JASA">Jasa</option></select>
             <input id="extra-item-qty" name="extra-item-qty" disabled={isLocked} className="qty-input" value={itemQty} onChange={(event) => setItemQty(event.target.value)} inputMode="numeric" />
             <input id="extra-item-price" name="extra-item-price" disabled={isLocked} className="price-input" value={itemPrice} onChange={(event) => setItemPrice(event.target.value)} placeholder="Harga" inputMode="numeric" />
@@ -204,14 +203,9 @@ export default function OrderDrawer({
           )}
 
           {order.status === 'WORKING' && additionalItems.length > 0 && (
-            <>
-              <button className="primary-button full-width" onClick={() => onStatusChange('READY', getAdditionalItemsPayload())}>
-                <CheckCircle size={16} /> Siap Bayar Langsung
-              </button>
-              <button className="secondary-button full-width" onClick={() => onStatusChange('APPROVAL', getAdditionalItemsPayload())}>
-                Minta Konfirmasi (Kirim Link Web) <ChevronRight size={15} />
-              </button>
-            </>
+            <button className="primary-button full-width" onClick={() => onStatusChange('APPROVAL', getAdditionalItemsPayload())}>
+              Minta Konfirmasi Pelanggan (Kirim Link) <ChevronRight size={15} />
+            </button>
           )}
 
           {order.status === 'WORKING' && additionalItems.length === 0 && (
@@ -221,9 +215,9 @@ export default function OrderDrawer({
           )}
 
           {order.status === 'APPROVAL' && (
-            <button className="primary-button full-width" onClick={() => onStatusChange('READY', order.items.filter(i => i.isAdditional))}>
-              Lanjut ke Siap Bayar <ChevronRight size={15} />
-            </button>
+            <div style={{ textAlign: 'center', padding: '10px', color: 'var(--warning)', fontSize: '11px', background: '#fff8df', borderRadius: '8px', border: '1px solid #f1d77d' }}>
+              Menunggu pelanggan menyetujui biaya tambahan via link tracking.
+            </div>
           )}
 
         </div>

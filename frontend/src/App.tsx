@@ -81,7 +81,7 @@ function App() {
     orders, setOrders, 
     parts, setParts, 
     services, setServices, 
-    transactions, setTransactions, 
+    transactions, // setTransactions dihapus
     mechanics, setMechanics, 
     fetchData 
   } = useData(showToast);
@@ -146,6 +146,12 @@ function App() {
     const order = orders.find((item) => item.id === orderId);
     if (!order || order.status === status || !allowedTransitions[order.status].includes(status)) return;
     
+    // Cegah drag-drop ke READY jika ada item tambahan (harus lewat approval)
+    if (status === 'READY' && order.items.some(i => i.isAdditional)) {
+      showToast('Gunakan Drawer untuk menyelesaikan pesanan dengan biaya tambahan.');
+      return;
+    }
+
     const prevOrders = [...orders];
     setOrders((current) => current.map((item) => (item.id === orderId ? { ...item, status } : item)));
     setDropTarget(null);
@@ -299,31 +305,21 @@ function App() {
         body: JSON.stringify({
           orderId: selection.order?.id || undefined,
           mode: selection.mode,
-          lines: selection.lines
         }),
       });
 
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      if (selection.mode === 'service' && selection.order?.id) {
-        setOrders((current) => current.filter(o => o.id !== selection.order!.id));
-      }
-      
-      if (data.transaction) {
-        setTransactions((current) => [data.transaction, ...current]);
-      }
-
-      setParts((current) => current.map(part => {
-        const line = selection.lines.find(l => l.id === part.id || l.name.toLowerCase() === part.name.toLowerCase());
-        return line ? { ...part, stock: Math.max(0, part.stock - line.qty) } : part;
-      }));
+      // Hapus manipulasi state lokal. Cukup fetch ulang dari server.
+      await fetchData(); 
 
       setCashierSelection(null);
       setFinalReceipt(selection);
       setCart([]);
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Terjadi kesalahan saat menyimpan transaksi');
+      throw error; // Re-throw agar CashierPage tahu prosesnya gagal
     }
   };
 
@@ -366,14 +362,17 @@ function App() {
         </div>
         <div className="global-search">
           <Search size={19} />
-          {/* Perbaikan: Menambahkan id dan name pada input pencarian */}
           <input id="global-search" name="global-search" aria-label="Cari" value={orderSearch} onChange={(event) => setOrderSearch(event.target.value)} onFocus={() => setSearchFocused(true)} onKeyDown={(event) => { if (event.key === 'Escape') { setOrderSearch(''); setSearchFocused(false); } if (event.key === 'Enter' && searchResults[0]) openSearchResult(searchResults[0]); }} placeholder="Cari No. Pesanan / plat…" />
           {orderSearch && <button className="search-clear" onClick={() => setOrderSearch('')}><X size={15} /></button>}
           {searchFocused && orderSearch.trim() && <div className="search-results">{searchResults.length ? searchResults.map((order) => <button key={order.id} className="search-result" onClick={() => openSearchResult(order)}><span><strong>{order.vehicle}</strong><small>{order.plate || 'Tanpa plat'}</small></span><ChevronRight size={15} /></button>) : <div className="search-no-result">Tidak ditemukan</div>}</div>}
         </div>
         <div className="topbar-actions">
-          <button className="icon-button notification-button" onClick={() => setBellOpen((open) => !open)}><Bell size={20} /><span className="notification-dot" /></button>
-          {bellOpen && <div className="bell-dropdown fade-in"><div className="bell-dropdown-header"><strong>Notifikasi Stok</strong></div><div className="bell-dropdown-list">{stockAlerts.map((item) => <div key={item.id} className="bell-dropdown-item" onClick={() => { setBellOpen(false); navigateView('stock'); }}><span className={`bell-item-dot ${item.stock === 0 ? 'danger' : 'warning'}`} /><div><strong>{item.name}</strong><small>tersisa {item.stock} pcs</small></div></div>)}</div></div>}
+          <button className="icon-button notification-button" onClick={() => setBellOpen((open) => !open)}>
+            <Bell size={20} />
+            {/* Titik notifikasi hanya muncul jika ada alert stok */}
+            {stockAlerts.length > 0 && <span className="notification-dot" />}
+          </button>
+          {bellOpen && <div className="bell-dropdown fade-in"><div className="bell-dropdown-header"><strong>Notifikasi Stok</strong></div><div className="bell-dropdown-list">{stockAlerts.length > 0 ? stockAlerts.map((item) => <div key={item.id} className="bell-dropdown-item" onClick={() => { setBellOpen(false); navigateView('stock'); }}><span className={`bell-item-dot ${item.stock === 0 ? 'danger' : 'warning'}`} /><div><strong>{item.name}</strong><small>tersisa {item.stock} pcs</small></div></div>) : <div style={{ padding: '16px', fontSize: '12px', color: 'var(--neutral-600)', textAlign: 'center' }}>Semua stok aman</div>}</div></div>}
           <button className="admin-profile admin-profile-button" onClick={handleLogout}>
             <div className="admin-avatar">{avatarInitials}</div>
             <div className="admin-copy"><strong>{authUser.name}</strong><span>Keluar</span></div>
