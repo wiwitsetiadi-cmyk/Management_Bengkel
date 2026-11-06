@@ -2,22 +2,13 @@ import { useState } from 'react';
 import { X, Bike, FileText, Printer, Check } from 'lucide-react';
 import type { Order } from '../data';
 
-function TicketQr() {
-  const cells = [0, 1, 2, 5, 7, 8, 10, 12, 13, 14, 16, 18, 19, 20, 22, 23, 24, 26, 28, 29, 30, 32, 34, 35, 36, 38, 39, 40, 42, 44, 45, 46, 48, 49, 50, 52, 54, 56, 57, 58, 60, 62, 64, 65, 66, 68, 70, 72, 73, 74, 76, 78, 80, 81, 82];
-  return (
-    <svg className="ticket-qr-svg" viewBox="0 0 90 90" role="img" aria-label="QR code tracking tiket">
-      {cells.map((cell) => <rect key={cell} x={(cell % 9) * 10} y={Math.floor(cell / 9) * 10} width="8" height="8" />)}
-      <rect x="5" y="5" width="25" height="25" fill="none" stroke="currentColor" strokeWidth="5" />
-      <rect x="60" y="5" width="25" height="25" fill="none" stroke="currentColor" strokeWidth="5" />
-      <rect x="5" y="60" width="25" height="25" fill="none" stroke="currentColor" strokeWidth="5" />
-    </svg>
-  );
-}
-
 export default function TicketPreview({ order, onClose }: { order: Order; onClose: () => void }) {
   const [paperWidth, setPaperWidth] = useState<'58' | '80'>('80');
   const [copied, setCopied] = useState(false);
   const trackingUrl = `${window.location.origin}/tracking/${order.trackingToken}`;
+  
+  // Perbaikan: Generate URL QR Code menggunakan API gratis
+  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(trackingUrl)}`;
   
   const copyTrackingLink = async () => {
     await navigator.clipboard.writeText(trackingUrl);
@@ -59,7 +50,13 @@ export default function TicketPreview({ order, onClose }: { order: Order; onClos
               <div><span>Plat</span><strong>{order.plate || '-'}</strong></div>
             </div>
             <div className="receipt-service-line"><span>Keluhan / servis</span><strong>{order.issue}</strong></div>
-            <div className="receipt-qr"><TicketQr /><strong>{trackingUrl}</strong><span>Scan untuk pantau progres servis Anda.<br />Tanpa instal, tanpa login.</span></div>
+            
+            <div className="receipt-qr">
+              <img src={qrImageUrl} alt="QR Code Tracking" style={{ width: 108, height: 108 }} />
+              <strong>{trackingUrl}</strong>
+              <span>Scan untuk pantau progres servis Anda.<br />Tanpa instal, tanpa login.</span>
+            </div>
+            
             <div className="receipt-rule" />
             <p className="receipt-note">Simpan tiket ini untuk pengambilan kendaraan.</p>
             <footer>Terima kasih telah mempercayakan motor Anda.</footer>
