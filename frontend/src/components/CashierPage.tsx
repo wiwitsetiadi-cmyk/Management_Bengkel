@@ -1,11 +1,13 @@
 import { useState } from 'react';
-import { CreditCard, ChevronRight, Search, Check, AlertCircle, Bike } from 'lucide-react';
+import { CreditCard, ChevronRight, Check, AlertCircle, Bike } from 'lucide-react';
 import { formatRupiah } from '../data';
 import type { CashierSelection, Order } from '../data';
 
-export default function CashierPage({ selection, orders, onSelectOrder, onPaid }: { selection: CashierSelection | null; orders: Order[]; onSelectOrder: (order: Order) => void; onPaid: (selection: CashierSelection) => void }) {
+export default function CashierPage({ selection, orders, onSelectOrder, onPaid }: { selection: CashierSelection | null; orders: Order[]; onSelectOrder: (order: Order) => void; onPaid: (selection: CashierSelection) => Promise<void> }) {
   const [payments, setPayments] = useState<{ id: number; method: 'Manual'; amount: number }[]>([{ id: 1, method: 'Manual', amount: 0 }]);
   const [confirmOpen, setConfirmOpen] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false); // Perbaikan: State loading
+  
   const total = selection?.total || 0;
   const paid = payments[0]?.amount || 0;
   const change = Math.max(0, paid - total);
@@ -13,7 +15,14 @@ export default function CashierPage({ selection, orders, onSelectOrder, onPaid }
   
   const formatInputValue = (value: number) => value ? formatRupiah(value) : '';
   const updatePayment = (amount: number) => setPayments([{ id: 1, method: 'Manual', amount }]);
-  const finishPayment = () => { if (selection) { setConfirmOpen(false); onPaid({ ...selection, payments: payments.filter((p) => p.amount > 0), change }); } };
+  
+  const finishPayment = async () => { 
+    if (selection) { 
+      setIsProcessing(true);
+      await onPaid({ ...selection, payments: payments.filter((p) => p.amount > 0), change }); 
+      setIsProcessing(false);
+    } 
+  };
 
   if (!selection) return (
     <div className="cashier-empty-page">
@@ -46,7 +55,7 @@ export default function CashierPage({ selection, orders, onSelectOrder, onPaid }
         <section className="invoice-card">
           <div className="cashier-card-heading">
             <div><span className="drawer-eyebrow">RINCIAN PESANAN</span><h2>{selection.order?.vehicle}</h2></div>
-            <button className="secondary-button" onClick={() => window.history.pushState({}, '', '/kasir')}><Search size={15} /> Cari pesanan</button>
+            {/* Tombol Cari Pesanan dihapus karena hanya melakukan pushState tanpa reset state */}
           </div>
           <div className="invoice-vehicle">
             <div className="vehicle-icon"><Bike size={27} /></div>
@@ -76,8 +85,7 @@ export default function CashierPage({ selection, orders, onSelectOrder, onPaid }
             <div className="payment-row">
               <div className="payment-row-top"><span>Nominal pembayaran</span><span className="manual-payment-label">Input manual admin</span></div>
               <div className="payment-input-row manual-payment-input">
-                {/* Perbaikan: Menambahkan id dan name pada input nominal pembayaran */}
-                <input id="payment-amount" name="payment-amount" value={formatInputValue(payments[0]?.amount || 0)} onChange={(event) => updatePayment(Number(event.target.value.replace(/[^0-9]/g, '')))} placeholder="Rp 0" inputMode="numeric" aria-label="Nominal pembayaran" />
+                <input id="payment-amount" name="payment-amount" value={formatInputValue(payments[0]?.amount || 0)} onChange={(event) => updatePayment(Number(event.target.value.replace(/[^0-9]/g, '')))} placeholder="Rp 0" inputMode="numeric" aria-label="Nominal pembayaran" disabled={isProcessing} />
               </div>
             </div>
           </div>
@@ -86,7 +94,9 @@ export default function CashierPage({ selection, orders, onSelectOrder, onPaid }
             <div><span>Dibayar</span><strong>{formatRupiah(paid)}</strong></div>
             <div className={remaining ? 'due' : 'change'}><span>{remaining ? 'Kurang' : 'Kembalian'}</span><strong>{formatRupiah(remaining || change)}</strong><small>{!remaining && change ? 'Nominal lebih dari total tagihan' : ''}</small></div>
           </div>
-          <button className="primary-button full-width settle-button" disabled={paid < total} onClick={() => setConfirmOpen(true)}><Check size={17} /> Lunas & Cetak Struk</button>
+          <button className="primary-button full-width settle-button" disabled={paid < total || isProcessing} onClick={() => setConfirmOpen(true)}>
+            {isProcessing ? 'Memproses...' : <><Check size={17} /> Lunas & Cetak Struk</>}
+          </button>
         </section>
       </div>
       {confirmOpen && (
@@ -95,7 +105,12 @@ export default function CashierPage({ selection, orders, onSelectOrder, onPaid }
             <div className="confirm-icon"><AlertCircle size={22} /></div>
             <h2>Konfirmasi transaksi lunas?</h2>
             <p>Transaksi yang sudah Lunas terkunci permanen dan tidak dapat diubah.</p>
-            <div><button className="secondary-button" onClick={() => setConfirmOpen(false)}>Periksa lagi</button><button className="primary-button" onClick={finishPayment}>Ya, Lunas</button></div>
+            <div>
+              <button className="secondary-button" onClick={() => setConfirmOpen(false)} disabled={isProcessing}>Periksa lagi</button>
+              <button className="primary-button" onClick={finishPayment} disabled={isProcessing}>
+                {isProcessing ? 'Menyimpan...' : 'Ya, Lunas'}
+              </button>
+            </div>
           </div>
         </div>
       )}
