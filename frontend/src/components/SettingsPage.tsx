@@ -43,7 +43,6 @@ function MechanicsTab({ mechanics, setMechanics, onAdd, onEdit, showToast }: { m
       const res = await fetchApi(`/api/mechanics/${m.id}`, { method: 'PUT', body: JSON.stringify({ name: m.name, isActive: !m.isActive }) });
       if (!res.ok) throw new Error();
       const updated = await res.json();
-      
       setMechanics(curr => curr.map(item => item.id === m.id ? updated : item));
     } catch { showToast('Gagal mengubah status mekanik'); }
   };
@@ -72,6 +71,8 @@ function MechanicsTab({ mechanics, setMechanics, onAdd, onEdit, showToast }: { m
 function CommissionTab({ showToast }: { showToast: (msg: string) => void }) {
   const [servicePercent, setServicePercent] = useState('10');
   const [partsPercent, setPartsPercent] = useState('0');
+  // Perbaikan Bug 7: Simpan state overrides agar tidak terhapus
+  const [overrides, setOverrides] = useState<Record<string, any>>({});
   const [loading, setLoading] = useState(true);
   const [saving, setSaving] = useState(false);
 
@@ -79,13 +80,21 @@ function CommissionTab({ showToast }: { showToast: (msg: string) => void }) {
     fetchApi('/api/commission').then(res => res.json()).then(data => {
       setServicePercent(String(data.servicePercent));
       setPartsPercent(String(data.partsPercent));
+      if (data.overrides) setOverrides(data.overrides);
     }).finally(() => setLoading(false));
   }, []);
 
   const save = async () => {
     setSaving(true);
     try {
-      await fetchApi('/api/commission', { method: 'PUT', body: JSON.stringify({ servicePercent: Number(servicePercent), partsPercent: Number(partsPercent), overrides: {} }) });
+      await fetchApi('/api/commission', { 
+        method: 'PUT', 
+        body: JSON.stringify({ 
+          servicePercent: Number(servicePercent), 
+          partsPercent: Number(partsPercent), 
+          overrides // Kirim state overrides yang ada
+        }) 
+      });
       showToast('Aturan komisi disimpan');
     } catch { showToast('Gagal menyimpan'); } finally { setSaving(false); }
   };
@@ -98,7 +107,6 @@ function CommissionTab({ showToast }: { showToast: (msg: string) => void }) {
         <label className="settings-form-field" htmlFor="commission-service">
           <span>Komisi Jasa (%)</span>
           <div className="settings-percent-input">
-            {/* Perbaikan: Menambahkan id dan name pada input */}
             <input id="commission-service" name="commission-service" type="number" value={servicePercent} onChange={(e) => setServicePercent(e.target.value)} />
             <em>%</em>
           </div>
@@ -106,7 +114,6 @@ function CommissionTab({ showToast }: { showToast: (msg: string) => void }) {
         <label className="settings-form-field" htmlFor="commission-parts">
           <span>Komisi Sparepart (%)</span>
           <div className="settings-percent-input">
-            {/* Perbaikan: Menambahkan id dan name pada input */}
             <input id="commission-parts" name="commission-parts" type="number" value={partsPercent} onChange={(e) => setPartsPercent(e.target.value)} />
             <em>%</em>
           </div>
@@ -136,7 +143,6 @@ function MechanicModal({ mechanic, mechanics, onClose, onSuccess, showToast }: {
       
       if (!res.ok) throw new Error();
       const data = await res.json();
-      
       onSuccess(data, !!mechanic);
     } catch { 
       showToast('Gagal menyimpan mekanik'); 
@@ -150,7 +156,6 @@ function MechanicModal({ mechanic, mechanics, onClose, onSuccess, showToast }: {
       <section className="settings-modal" onClick={(e) => e.stopPropagation()}>
         <div className="modal-heading"><h2>{mechanic ? 'Edit' : 'Tambah'} Mekanik</h2><button className="close-button" onClick={onClose}><X size={20} /></button></div>
         <div className="settings-modal-body">
-          {/* Perbaikan: Menambahkan id dan name pada semua input di Modal */}
           <label className="settings-form-field" htmlFor="mechanic-code">
             <span>ID Mekanik</span>
             <input id="mechanic-code" name="mechanic-code" value={code} readOnly />
