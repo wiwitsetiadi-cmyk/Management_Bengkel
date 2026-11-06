@@ -1,6 +1,6 @@
 // src/data/index.ts
 
-export type OrderStatus = 'QUEUE' | 'WORKING' | 'APPROVAL' | 'READY';
+export type OrderStatus = 'QUEUE' | 'WORKING' | 'APPROVAL' | 'READY' | 'PAID'; // ✅ Tambah PAID
 export type OrderMode = 'service' | 'parts';
 export type ItemType = 'JASA' | 'SPAREPART';
 
@@ -50,6 +50,7 @@ export type Order = {
   status: OrderStatus;
   color: string;
   createdAt: string;
+  paidAt?: string; // ✅ Tambah paidAt
   mechanicId?: string;
   mechanic?: Mechanic;
   items: OrderItem[];
@@ -104,7 +105,7 @@ export type AdditionalItemPayload = {
 };
 
 // ============================================================
-// ✅ DITAMBAH: Logika Stok dipindah ke sini (dari StockPage.tsx)
+// LOGIKA STOK
 // ============================================================
 export type StockStatus = 'aman' | 'menipis' | 'habis';
 
@@ -127,8 +128,9 @@ export function getStockAlerts(parts: Sparepart[]): Sparepart[] {
 export const allowedTransitions: Record<OrderStatus, OrderStatus[]> = {
   QUEUE: ['WORKING'],
   WORKING: ['APPROVAL', 'READY'],
-  APPROVAL: ['READY', 'WORKING'],
-  READY: [],
+  APPROVAL: ['WORKING'], // Hanya via approve pelanggan
+  READY: ['PAID'],
+  PAID: [],
 };
 
 export const columns: { id: OrderStatus; title: string; shortTitle: string; tone: string }[] = [
@@ -136,6 +138,7 @@ export const columns: { id: OrderStatus; title: string; shortTitle: string; tone
   { id: 'WORKING', title: 'Dikerjakan', shortTitle: 'Dikerjakan', tone: 'blue' },
   { id: 'APPROVAL', title: 'Tunggu Konfirmasi', shortTitle: 'Konfirmasi', tone: 'amber' },
   { id: 'READY', title: 'Siap Bayar', shortTitle: 'Siap Bayar', tone: 'green' },
+  // PAID tidak dimasukkan ke kolom Kanban
 ];
 
 // ============================================================
