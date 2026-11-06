@@ -17,6 +17,7 @@ enum OrderStatus {
   WORKING
   APPROVAL
   READY
+  PAID // ✅ TAMBAHAN: Status baru untuk pesanan yang sudah dibayar
 }
 
 enum ItemType {
@@ -84,6 +85,7 @@ model Order {
 
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
+  paidAt        DateTime?   // ✅ TAMBAHAN: Waktu pembayaran lunas
 
   items         OrderItem[]
   transactions  Transaction[]
