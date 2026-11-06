@@ -1,14 +1,14 @@
 import { useMemo, useState } from 'react';
-import { ChevronRight, Download, Lock, Printer, TrendingUp, Wallet, Wrench, Package, Receipt } from 'lucide-react';
+import { ChevronRight, Lock, TrendingUp, Wallet, Wrench, Package, Receipt } from 'lucide-react';
 import { getLocalDateISO } from '../data';
 import type { Transaction } from '../data';
 
-type Period = 'today' | '7days' | 'month' | 'custom';
+type Period = 'today' | 'all';
 type TxFilter = 'all' | 'service' | 'parts';
 
 const formatRupiah = (value: number) => `Rp ${value.toLocaleString('id-ID')}`;
 
-export default function ReportsPage({ transactions, showToast }: { transactions: Transaction[]; showToast: (message: string) => void }) {
+export default function ReportsPage({ transactions }: { transactions: Transaction[]; showToast?: (message: string) => void }) {
   const [period, setPeriod] = useState<Period>('today');
   const [txFilter, setTxFilter] = useState<TxFilter>('all');
   const [expandedMechanic, setExpandedMechanic] = useState<string | null>(null);
@@ -65,7 +65,7 @@ export default function ReportsPage({ transactions, showToast }: { transactions:
       const parts = date.split('-');
       return {
         date,
-        label: parts[2], // Hanya ambil tanggal (DD)
+        label: parts[2],
         amount: revenueByDate[date],
       };
     });
@@ -84,10 +84,9 @@ export default function ReportsPage({ transactions, showToast }: { transactions:
         <div className="reports-heading-actions">
           <div className="reports-period-switch" role="group" aria-label="Filter periode">
             <button className={period === 'today' ? 'selected' : ''} onClick={() => setPeriod('today')}>Hari ini</button>
-            <button className={period === '7days' ? 'selected' : ''} onClick={() => setPeriod('7days')}>7 Hari</button>
-            <button className={period === 'month' ? 'selected' : ''} onClick={() => setPeriod('month')}>Bulan ini</button>
+            <button className={period === 'all' ? 'selected' : ''} onClick={() => setPeriod('all')}>Semua Waktu</button>
           </div>
-          <button className="secondary-button" onClick={() => showToast('Laporan diekspor ke CSV')}><Download size={16} /> Ekspor CSV</button>
+          {/* Tombol CSV dihapus karena belum berfungsi */}
         </div>
       </div>
 
@@ -107,7 +106,7 @@ export default function ReportsPage({ transactions, showToast }: { transactions:
           </section>
 
           <section className="reports-card reports-commission-card">
-            <div className="reports-card-header"><h2>Komisi per Mekanik</h2><span className="reports-card-note">Komisi dihitung dari aturan di Pengaturan ➔ Aturan Komisi.</span></div>
+            <div className="reports-card-header"><h2>Komisi per Mekanik</h2><span className="reports-card-note">Komisi dihitung dari aturan di Pengaturan - Aturan Komisi.</span></div>
             <div className="reports-commission-table">
               <div className="reports-commission-head">
                 <span>Mekanik</span><span className="right">Servis Lunas</span><span className="right">Omzet Jasa</span><span className="right">Omzet Sparepart</span><span className="right">Komisi</span>
@@ -167,7 +166,7 @@ export default function ReportsPage({ transactions, showToast }: { transactions:
             </div>
             <div className="reports-tx-table">
               <div className="reports-tx-head">
-                <span>No. Pesanan</span><span>Waktu</span><span>Jenis</span><span>Mekanik</span><span>Metode</span><span className="right">Total</span><span className="right">Aksi</span>
+                <span>No. Pesanan</span><span>Waktu</span><span>Jenis</span><span>Mekanik</span><span>Metode</span><span className="right">Total</span><span className="right">Status</span>
               </div>
               {displayTransactions.map((t) => (
                 <div key={t.id} className="reports-tx-row">
@@ -178,8 +177,7 @@ export default function ReportsPage({ transactions, showToast }: { transactions:
                   <span><span className={`reports-method-chip ${t.method === 'QRIS' ? 'qris' : 'cash'}`}>{t.method}</span></span>
                   <span className="right tabular-nums reports-tx-total">{formatRupiah(t.total)}</span>
                   <span className="right reports-tx-actions">
-                    <Lock size={14} className="reports-lock-icon" />
-                    <button className="reports-reprint-button" onClick={() => showToast(`Cetak ulang struk`)}><Printer size={14} /> Cetak ulang</button>
+                    <Lock size={14} className="reports-lock-icon" /> Lunas
                   </span>
                 </div>
               ))}
