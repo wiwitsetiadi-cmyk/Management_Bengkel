@@ -1,5 +1,5 @@
 import { useState, useMemo } from 'react';
-import { X, Check, FileText, Package, Plus, Trash2, ChevronRight, AlertCircle } from 'lucide-react'; // CheckCircle dihapus
+import { X, Check, FileText, Package, Plus, Trash2, ChevronRight, AlertCircle } from 'lucide-react';
 import { formatRupiah, columns } from '../data';
 import type { Order, OrderStatus, Sparepart, AdditionalItemPayload } from '../data';
 
@@ -10,7 +10,7 @@ type DetailItem = {
   qty: number;
   price: number;
   additional: boolean;
-  locked?: boolean;
+  approved: boolean; // ✅ MVP-1 1.1: sudah disetujui pelanggan?
   stock?: number;
   sparepartId?: string | null;
 };
@@ -27,21 +27,26 @@ function CostRow({ item, locked, onRemove }: { item: DetailItem; locked?: boolea
   );
 }
 
-export default function OrderDrawer({ 
-  order, 
-  parts, 
-  onClose, 
+export default function OrderDrawer({
+  order,
+  parts,
+  onClose,
   onStatusChange
-}: { 
-  order: Order; 
-  parts: Sparepart[]; 
-  onClose: () => void; 
-  onStatusChange: (status: OrderStatus, additionalItems?: AdditionalItemPayload[]) => void; 
+}: {
+  order: Order;
+  parts: Sparepart[];
+  onClose: () => void;
+  onStatusChange: (status: OrderStatus, additionalItems?: AdditionalItemPayload[]) => void;
 }) {
   const initialItems = useMemo(() => {
     return (order.items || []).map((item) => {
       const realPart = parts.find((p) => p.id === item.sparepartId);
-      return { ...item, additional: item.isAdditional, stock: item.type === 'SPAREPART' ? realPart?.stock : undefined };
+      return {
+        ...item,
+        additional: item.isAdditional,
+        approved: Boolean(item.approvedAt), // ✅ MVP-1 1.1
+        stock: item.type === 'SPAREPART' ? realPart?.stock : undefined
+      };
     });
   }, [order, parts]);
 
@@ -54,12 +59,17 @@ export default function OrderDrawer({
   const [itemSparepartId, setItemSparepartId] = useState<string | null>(null);
   const [itemError, setItemError] = useState('');
   const [copied, setCopied] = useState(false);
-  
+
+  // ✅ MVP-1 1.1: Pisahkan pending vs yang sudah disetujui
+  const baseItems = items.filter((item) => !item.additional);
+  const pendingItems = items.filter((item) => item.additional && !item.approved);
+  const approvedItems = items.filter((item) => item.additional && item.approved);
   const additionalItems = items.filter((item) => item.additional);
-  const baseTotal = items.filter((item) => !item.additional).reduce((total, item) => total + item.price * item.qty, 0);
+
+  const baseTotal = baseItems.reduce((total, item) => total + item.price * item.qty, 0);
   const additionalTotal = additionalItems.reduce((total, item) => total + item.price * item.qty, 0);
   const newTotal = baseTotal + additionalTotal;
-  
+
   const isLocked = order.status === 'APPROVAL' || order.status === 'READY' || order.status === 'PAID';
   const trackingUrl = `${window.location.origin}/tracking/${order.trackingToken}`;
 
@@ -90,7 +100,7 @@ export default function OrderDrawer({
     setItemError('');
     setItems((current) => [
       ...current,
-      { id: `extra-${Date.now()}`, name: itemName.trim(), type: itemType, qty, price, additional: true, stock: realStock, sparepartId: itemSparepartId },
+      { id: `extra-${Date.now()}`, name: itemName.trim(), type: itemType, qty, price, additional: true, approved: false, stock: realStock, sparepartId: itemSparepartId },
     ]);
     setItemName('');
     setItemPrice('');
@@ -99,8 +109,9 @@ export default function OrderDrawer({
     setItemSparepartId(null);
   };
 
-  const getAdditionalItemsPayload = (): AdditionalItemPayload[] => {
-    return additionalItems.map((item) => ({
+  // ✅ MVP-1 1.1: Hanya kirim item pending (yang sudah disetujui tidak boleh diubah)
+  const getPendingItemsPayload = (): AdditionalItemPayload[] => {
+    return pendingItems.map((item) => ({
       id: item.id,
       name: item.name,
       type: item.type,
@@ -111,7 +122,10 @@ export default function OrderDrawer({
   };
 
   const removeDetailItem = (itemId: string) => {
-    if (!isLocked) setItems((current) => current.filter((item) => item.id !== itemId));
+    if (isLocked) return;
+    const target = items.find((item) => item.id === itemId);
+    if (target?.approved) return;
+    setItems((current) => current.filter((item) => item.id !== itemId));
   };
 
   return (
@@ -125,12 +139,12 @@ export default function OrderDrawer({
           </div>
           <button className="close-button" onClick={onClose}><X size={20} /></button>
         </div>
-        
+
         <div className="drawer-status">
           <span className={`status-dot ${order.status.toLowerCase()}`} />
           {columns.find((column) => column.id === order.status)?.title || order.status}
         </div>
-        
+
         <div className="order-info-grid">
           <div><span>Waktu masuk</span><strong>{new Date(order.createdAt).toLocaleTimeString('id-ID')}</strong></div>
           <div className="info-mechanic"><span>Mekanik</span><strong>{order.mechanic?.name || 'Belum ditugaskan'}</strong></div>
@@ -142,22 +156,25 @@ export default function OrderDrawer({
             </div>
           </div>
         </div>
-        
+
         <div className="drawer-section cost-section">
           <div className="section-heading">
             <div><span className="drawer-label">RINCIAN BIAYA</span><strong>Estimasi transaksi</strong></div>
           </div>
           <div className="cost-table">
             <div className="cost-table-head"><span>Item</span><span>Tipe</span><span>Qty</span><span>Harga</span><span>Subtotal</span></div>
-            {items.some((item) => !item.additional) && (
-              <>{items.filter((item) => !item.additional).map((item) => <CostRow key={item.id} item={item} />)}</>
+            {baseItems.length > 0 && (
+              <>{baseItems.map((item) => <CostRow key={item.id} item={item} />)}</>
             )}
-            {additionalItems.length > 0 && (
-              <>{additionalItems.map((item) => <CostRow key={item.id} item={item} locked={isLocked} onRemove={() => removeDetailItem(item.id)} />)}</>
+            {approvedItems.length > 0 && (
+              <>{approvedItems.map((item) => <CostRow key={item.id} item={item} locked />)}</>
+            )}
+            {pendingItems.length > 0 && (
+              <>{pendingItems.map((item) => <CostRow key={item.id} item={item} locked={isLocked} onRemove={() => removeDetailItem(item.id)} />)}</>
             )}
           </div>
         </div>
-        
+
         <div className="add-item-section">
           <div className="section-heading">
             <div><span className="drawer-label">TAMBAH ITEM</span><strong>Biaya tambahan</strong></div>
@@ -187,37 +204,42 @@ export default function OrderDrawer({
             <small className="stock-hint"><Package size={12} /> Sisa stok: {itemStock} pcs</small>
           ) : null}
         </div>
-        
+
         <div className="cost-summary">
           <div><span>Total item</span><strong>{formatRupiah(baseTotal)}</strong></div>
           <div><span>Total tambahan</span><strong>{formatRupiah(additionalTotal)}</strong></div>
           <div className="grand-total"><span>Total baru</span><strong>{formatRupiah(newTotal)}</strong></div>
         </div>
-        
+
         <div className="drawer-footer drawer-footer-sticky" style={{ display: 'flex', flexDirection: 'column', gap: '8px' }}>
-          
+
           {order.status === 'QUEUE' && (
             <button className="primary-button full-width" onClick={() => onStatusChange('WORKING', [])}>
               Mulai Dikerjakan <ChevronRight size={15} />
             </button>
           )}
 
-          {order.status === 'WORKING' && additionalItems.length > 0 && (
-            <button className="primary-button full-width" onClick={() => onStatusChange('APPROVAL', getAdditionalItemsPayload())}>
+          {order.status === 'WORKING' && pendingItems.length > 0 && (
+            <button className="primary-button full-width" onClick={() => onStatusChange('APPROVAL', getPendingItemsPayload())}>
               Minta Konfirmasi Pelanggan (Kirim Link) <ChevronRight size={15} />
             </button>
           )}
 
-          {order.status === 'WORKING' && additionalItems.length === 0 && (
+          {order.status === 'WORKING' && pendingItems.length === 0 && (
             <button className="primary-button full-width" onClick={() => onStatusChange('READY', [])}>
               Selesai & Siap Bayar <ChevronRight size={15} />
             </button>
           )}
 
           {order.status === 'APPROVAL' && (
-            <div style={{ textAlign: 'center', padding: '10px', color: 'var(--warning)', fontSize: '11px', background: '#fff8df', borderRadius: '8px', border: '1px solid #f1d77d' }}>
-              Menunggu pelanggan menyetujui biaya tambahan via link tracking.
-            </div>
+            <>
+              <div style={{ textAlign: 'center', padding: '10px', color: 'var(--warning)', fontSize: '11px', background: '#fff8df', borderRadius: '8px', border: '1px solid #f1d77d' }}>
+                Menunggu pelanggan menyetujui biaya tambahan via link tracking.
+              </div>
+              <button className="secondary-button" style={{ width: '100%' }} onClick={() => onStatusChange('WORKING', [])}>
+                Batalkan Permintaan Konfirmasi
+              </button>
+            </>
           )}
 
         </div>
