@@ -306,8 +306,8 @@ app.post('/api/orders', requireAuth, async (req, res) => {
   }
 });
 
-// ✅ MVP-1 1.1: Perubahan — cek pending saat READY, pertahankan item yang sudah disetujui,
-// dan hapus pending saat admin membatalkan APPROVAL
+// ✅ MVP-1 1.1 + 1.2: Endpoint status — PAID hanya via checkout, additionalItems hanya via APPROVAL,
+// klaim status atomik dengan updateMany (409 bila gagal), respons menyertakan mechanic + sparepart.
 app.put('/api/orders/:id/status', requireAuth, async (req, res) => {
   try {
     const id = req.params.id as string;
@@ -315,6 +315,16 @@ app.put('/api/orders/:id/status', requireAuth, async (req, res) => {
 
     if (!newStatus || !Object.keys(ALLOWED_TRANSITIONS).includes(newStatus)) {
       return res.status(400).json({ error: 'Status tidak valid.' });
+    }
+
+    // ✅ MVP-1 1.2: PAID hanya lewat checkout, bukan lewat endpoint status
+    if (newStatus === 'PAID') {
+      return res.status(400).json({ error: 'Status PAID hanya bisa melalui checkout.' });
+    }
+
+    // ✅ MVP-1 1.2: additionalItems hanya boleh dikirim saat mengajukan APPROVAL
+    if (newStatus !== 'APPROVAL' && Array.isArray(additionalItems) && additionalItems.length > 0) {
+      return res.status(400).json({ error: 'Item tambahan hanya boleh dikirim saat mengajukan konfirmasi (APPROVAL).' });
     }
 
     const currentOrder = await prisma.order.findUnique({ where: { id } });
@@ -339,33 +349,55 @@ app.put('/api/orders/:id/status', requireAuth, async (req, res) => {
       }
     }
 
-    if (currentOrder.status === 'WORKING' && additionalItems?.length > 0) {
+    // Validasi item tambahan kalau dikirim (hanya mungkin saat APPROVAL)
+    if (newStatus === 'APPROVAL' && additionalItems?.length > 0) {
       for (const item of additionalItems) {
         if (!item.name?.trim() || Number(item.price) < 0 || Number(item.qty) <= 0) {
           return res.status(400).json({ error: 'Data item tambahan tidak valid.' });
         }
       }
+    }
 
-      // ✅ MVP-1 1.1: Hanya ganti item pending; item yang sudah disetujui dipertahankan
-      await prisma.orderItem.deleteMany({ where: { orderId: id, isAdditional: true, approvedAt: null } });
-      await prisma.orderItem.createMany({
-        data: additionalItems.map((item: any) => ({
-          orderId: id, type: item.type, name: item.name.trim(), price: Number(item.price) || 0,
-          qty: Number(item.qty) || 1, sparepartId: item.sparepartId || null, isAdditional: true
-        }))
+    // ✅ MVP-1 1.2: Bungkus dalam transaksi + klaim status atomik
+    const updatedOrder = await prisma.$transaction(async (tx) => {
+      // Klaim status: hanya menang bila status saat ini masih sama dengan yang kita baca
+      const claim = await tx.order.updateMany({
+        where: { id, status: currentOrder.status },
+        data: { status: newStatus },
       });
-    }
 
-    // ✅ MVP-1 1.1: Admin membatalkan permintaan konfirmasi → hapus item pending saja
-    if (currentOrder.status === 'APPROVAL' && newStatus === 'WORKING') {
-      await prisma.orderItem.deleteMany({ where: { orderId: id, isAdditional: true, approvedAt: null } });
-    }
+      if (claim.count !== 1) {
+        throw new Error('RACE_CONDITION');
+      }
 
-    const updatedOrder = await prisma.order.update({
-      where: { id }, data: { status: newStatus }, include: { items: true }
+      // Ganti item pending hanya saat mengajukan APPROVAL
+      if (newStatus === 'APPROVAL' && additionalItems?.length > 0) {
+        await tx.orderItem.deleteMany({ where: { orderId: id, isAdditional: true, approvedAt: null } });
+        await tx.orderItem.createMany({
+          data: additionalItems.map((item: any) => ({
+            orderId: id, type: item.type, name: item.name.trim(), price: Number(item.price) || 0,
+            qty: Number(item.qty) || 1, sparepartId: item.sparepartId || null, isAdditional: true
+          }))
+        });
+      }
+
+      // ✅ MVP-1 1.1: Admin membatalkan permintaan konfirmasi → hapus item pending saja
+      if (currentOrder.status === 'APPROVAL' && newStatus === 'WORKING') {
+        await tx.orderItem.deleteMany({ where: { orderId: id, isAdditional: true, approvedAt: null } });
+      }
+
+      // ✅ MVP-1 1.2: Response menyertakan mechanic + sparepart (sama seperti GET /api/orders)
+      return tx.order.findUnique({
+        where: { id },
+        include: { items: { include: { sparepart: true } }, mechanic: true }
+      });
     });
+
     res.json(updatedOrder);
-  } catch (error) {
+  } catch (error: any) {
+    if (error.message === 'RACE_CONDITION') {
+      return res.status(409).json({ error: 'Status pesanan sudah berubah, silakan muat ulang.' });
+    }
     res.status(500).json({ error: 'Gagal update status pesanan.' });
   }
 });
