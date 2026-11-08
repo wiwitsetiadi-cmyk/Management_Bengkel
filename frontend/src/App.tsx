@@ -77,19 +77,19 @@ function App() {
     window.setTimeout(() => setToast(null), 3400);
   }, []);
 
-  const { 
-    orders, setOrders, 
-    parts, setParts, 
-    services, setServices, 
-    transactions, // setTransactions dihapus
-    mechanics, setMechanics, 
-    fetchData 
+  const {
+    orders, setOrders,
+    parts, setParts,
+    services, setServices,
+    transactions,
+    mechanics, setMechanics,
+    fetchData
   } = useData(showToast);
 
   const stockAlerts = useMemo(() => getStockAlerts(parts), [parts]);
 
   const handleLogin = (user: AuthUser) => setAuthUser(user);
-  
+
   const handleLogout = () => {
     localStorage.removeItem('bengkel_token');
     localStorage.removeItem('bengkel_user');
@@ -127,13 +127,13 @@ function App() {
   }, []);
 
   const counts = useMemo(() => columns.map((column) => orders.filter((order) => order.status === column.id).length), [orders]);
-  
+
   const searchResults = useMemo(() => {
     const query = orderSearch.trim().toLowerCase();
     if (!query) return [];
     return orders.filter((order) => [order.id, order.vehicle, order.plate].filter(Boolean).some((value) => value!.toLowerCase().includes(query)));
   }, [orders, orderSearch]);
-  
+
   const visibleOrders = orderSearch.trim() ? searchResults : orders;
 
   const openSearchResult = (order: Order) => {
@@ -145,17 +145,18 @@ function App() {
   const moveOrder = async (orderId: string, status: OrderStatus) => {
     const order = orders.find((item) => item.id === orderId);
     if (!order || order.status === status || !allowedTransitions[order.status].includes(status)) return;
-    
-    // Cegah drag-drop ke READY jika ada item tambahan (harus lewat approval)
-    if (status === 'READY' && order.items.some(i => i.isAdditional)) {
-      showToast('Gunakan Drawer untuk menyelesaikan pesanan dengan biaya tambahan.');
+
+    // ✅ MVP-1 1.1: Hanya blokir READY bila ada item pending (belum disetujui).
+    // Item tambahan yang sudah disetujui TIDAK memblokir lagi.
+    if (status === 'READY' && order.items.some(i => i.isAdditional && !i.approvedAt)) {
+      showToast('Masih ada biaya tambahan yang menunggu persetujuan pelanggan.');
       return;
     }
 
     const prevOrders = [...orders];
     setOrders((current) => current.map((item) => (item.id === orderId ? { ...item, status } : item)));
     setDropTarget(null);
-    
+
     try {
       const res = await fetchApi(`/api/orders/${orderId}/status`, {
         method: 'PUT',
@@ -164,7 +165,7 @@ function App() {
       if (!res.ok) {
         const data = await res.json();
         showToast(data.error || 'Gagal update status');
-        setOrders(prevOrders); 
+        setOrders(prevOrders);
       }
     } catch (error) {
       console.error(error);
@@ -180,13 +181,13 @@ function App() {
 
   const updateSelectedStatus = async (status: OrderStatus, additionalItems?: AdditionalItemPayload[]) => {
     if (!selectedOrder) return;
-    
+
     try {
       const res = await fetchApi(`/api/orders/${selectedOrder.id}/status`, {
         method: 'PUT',
         body: JSON.stringify({ status, additionalItems }),
       });
-      
+
       const data = await res.json();
       if (!res.ok) {
         showToast(data.error || 'Gagal menyimpan perubahan');
@@ -239,7 +240,7 @@ function App() {
     }
     const mechanic = mechanics.find((item) => item.id === serviceForm.mechanicId);
     const selectedService = services.find((s) => s.id === serviceForm.serviceType);
-    
+
     if (!mechanic || !serviceForm.vehicle.trim() || !selectedService) return;
 
     const newOrderPayload = {
@@ -248,7 +249,7 @@ function App() {
       issue: selectedService.name,
       color: mechanic.color,
       mechanicId: mechanic.id,
-      items: [{ type: 'JASA', name: selectedService.name, price: selectedService.price, qty: 1 }] 
+      items: [{ type: 'JASA', name: selectedService.name, price: selectedService.price, qty: 1 }]
     };
 
     try {
@@ -256,7 +257,7 @@ function App() {
         method: 'POST',
         body: JSON.stringify(newOrderPayload),
       });
-      
+
       const newOrder = await res.json();
       if (!res.ok) throw new Error(newOrder.error);
 
@@ -283,7 +284,7 @@ function App() {
       qty: i.qty,
       price: i.price
     }));
-    
+
     setCashierSelection({ mode: 'service', order, lines, total: lines.reduce((sum, line) => sum + line.price * line.qty, 0) });
     navigateView('cashier');
   };
@@ -292,7 +293,7 @@ function App() {
     if (cart.length === 0) return;
     const order = { id: '', vehicle: 'Sparepart langsung', issue: 'Pembelian sparepart', status: 'READY', color: '#DCEBE9', trackingToken: '', createdAt: new Date().toISOString(), items: [] } as unknown as Order;
     const lines = cart.map((item) => ({ id: item.id, name: item.name, type: 'SPAREPART' as const, qty: item.qty, price: item.price }));
-    
+
     setCashierSelection({ mode: 'parts', order, lines, total: lines.reduce((sum, line) => sum + line.price * line.qty, 0) });
     setOrderDialogOpen(false);
     navigateView('cashier');
@@ -311,15 +312,14 @@ function App() {
       const data = await res.json();
       if (!res.ok) throw new Error(data.error);
 
-      // Hapus manipulasi state lokal. Cukup fetch ulang dari server.
-      await fetchData(); 
+      await fetchData();
 
       setCashierSelection(null);
       setFinalReceipt(selection);
       setCart([]);
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Terjadi kesalahan saat menyimpan transaksi');
-      throw error; // Re-throw agar CashierPage tahu prosesnya gagal
+      throw error;
     }
   };
 
@@ -329,10 +329,10 @@ function App() {
         method: 'PUT',
         body: JSON.stringify({ accepted }),
       });
-      
+
       const data = await res.json();
       if (!res.ok) throw new Error('Gagal memproses persetujuan');
-      
+
       setOrders((current) => current.map(o => o.trackingToken === token ? data : o));
       showToast(accepted ? 'Biaya tambahan disetujui' : 'Biaya tambahan ditolak');
     } catch (error) {
@@ -369,7 +369,6 @@ function App() {
         <div className="topbar-actions">
           <button className="icon-button notification-button" onClick={() => setBellOpen((open) => !open)}>
             <Bell size={20} />
-            {/* Titik notifikasi hanya muncul jika ada alert stok */}
             {stockAlerts.length > 0 && <span className="notification-dot" />}
           </button>
           {bellOpen && <div className="bell-dropdown fade-in"><div className="bell-dropdown-header"><strong>Notifikasi Stok</strong></div><div className="bell-dropdown-list">{stockAlerts.length > 0 ? stockAlerts.map((item) => <div key={item.id} className="bell-dropdown-item" onClick={() => { setBellOpen(false); navigateView('stock'); }}><span className={`bell-item-dot ${item.stock === 0 ? 'danger' : 'warning'}`} /><div><strong>{item.name}</strong><small>tersisa {item.stock} pcs</small></div></div>) : <div style={{ padding: '16px', fontSize: '12px', color: 'var(--neutral-600)', textAlign: 'center' }}>Semua stok aman</div>}</div></div>}
