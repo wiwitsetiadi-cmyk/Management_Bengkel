@@ -44,7 +44,7 @@ const requireAuth = (req: express.Request, res: express.Response, next: express.
   const header = req.headers.authorization;
   const token = header?.startsWith('Bearer ') ? header.slice(7) : header;
   const payload = verifyToken(token);
-  
+
   if (!payload) {
     return res.status(401).json({ error: 'Akses ditolak. Silakan login.' });
   }
@@ -57,11 +57,10 @@ app.use(express.json());
 // ==========================================
 // 2. STATE MACHINE & HELPER KOMISI
 // ==========================================
-// ✅ PERBAIKAN 3: Larang bypass approval (APPROVAL hanya bisa ke WORKING via endpoint approve)
 const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   QUEUE: ['WORKING'],
   WORKING: ['APPROVAL', 'READY'],
-  APPROVAL: ['WORKING'], 
+  APPROVAL: ['WORKING'],
   READY: ['PAID'],
   PAID: []
 };
@@ -158,11 +157,11 @@ app.post('/api/spareparts', requireAuth, async (req, res) => {
     if (Number(price) < 0 || Number(stock) < 0 || Number(minStock) < 0) {
       return res.status(400).json({ error: 'Harga dan stok tidak boleh negatif.' });
     }
-    const part = await prisma.sparepart.create({ 
-      data: { 
-        code: code.trim(), name: name.trim(), category: category.trim(), 
-        price: Number(price) || 0, stock: Number(stock) || 0, minStock: Number(minStock) || 0 
-      } 
+    const part = await prisma.sparepart.create({
+      data: {
+        code: code.trim(), name: name.trim(), category: category.trim(),
+        price: Number(price) || 0, stock: Number(stock) || 0, minStock: Number(minStock) || 0
+      }
     });
     res.status(201).json(part);
   } catch (error) {
@@ -181,10 +180,10 @@ app.put('/api/spareparts/:id', requireAuth, async (req, res) => {
       return res.status(400).json({ error: 'Harga dan stok tidak boleh negatif.' });
     }
     const part = await prisma.sparepart.update({
-      where: { id }, 
-      data: { 
-        code: code.trim(), name: name.trim(), category: category.trim(), 
-        price: Number(price) || 0, stock: Number(stock) || 0, minStock: Number(minStock) || 0 
+      where: { id },
+      data: {
+        code: code.trim(), name: name.trim(), category: category.trim(),
+        price: Number(price) || 0, stock: Number(stock) || 0, minStock: Number(minStock) || 0
       }
     });
     res.json(part);
@@ -266,7 +265,6 @@ app.delete('/api/services/:id', requireAuth, async (req, res) => {
 // ==========================================
 // 6. ENDPOINT ORDER (KANBAN & STATE MACHINE)
 // ==========================================
-// ✅ PERBAIKAN 1: Hanya ambil order yang belum dibayar (PAID) untuk Kanban
 app.get('/api/orders', requireAuth, async (req, res) => {
   const orders = await prisma.order.findMany({
     where: { status: { not: 'PAID' } },
@@ -308,6 +306,8 @@ app.post('/api/orders', requireAuth, async (req, res) => {
   }
 });
 
+// ✅ MVP-1 1.1: Perubahan — cek pending saat READY, pertahankan item yang sudah disetujui,
+// dan hapus pending saat admin membatalkan APPROVAL
 app.put('/api/orders/:id/status', requireAuth, async (req, res) => {
   try {
     const id = req.params.id as string;
@@ -324,9 +324,19 @@ app.put('/api/orders/:id/status', requireAuth, async (req, res) => {
       return res.status(400).json({ error: `Transisi ilegal: Tidak bisa pindah dari ${currentOrder.status} ke ${newStatus}` });
     }
 
-    // ✅ PERBAIKAN 3: Wajibkan item tambahan jika mau minta approval
+    // Wajibkan item tambahan jika mau minta approval
     if (newStatus === 'APPROVAL' && (!additionalItems || additionalItems.length === 0)) {
       return res.status(400).json({ error: 'Harus ada biaya tambahan untuk meminta konfirmasi.' });
+    }
+
+    // ✅ MVP-1 1.1: Tolak READY selama masih ada item pending
+    if (newStatus === 'READY') {
+      const pendingCount = await prisma.orderItem.count({
+        where: { orderId: id, isAdditional: true, approvedAt: null },
+      });
+      if (pendingCount > 0) {
+        return res.status(400).json({ error: 'Masih ada biaya tambahan yang menunggu persetujuan pelanggan.' });
+      }
     }
 
     if (currentOrder.status === 'WORKING' && additionalItems?.length > 0) {
@@ -336,7 +346,8 @@ app.put('/api/orders/:id/status', requireAuth, async (req, res) => {
         }
       }
 
-      await prisma.orderItem.deleteMany({ where: { orderId: id, isAdditional: true } });
+      // ✅ MVP-1 1.1: Hanya ganti item pending; item yang sudah disetujui dipertahankan
+      await prisma.orderItem.deleteMany({ where: { orderId: id, isAdditional: true, approvedAt: null } });
       await prisma.orderItem.createMany({
         data: additionalItems.map((item: any) => ({
           orderId: id, type: item.type, name: item.name.trim(), price: Number(item.price) || 0,
@@ -345,7 +356,12 @@ app.put('/api/orders/:id/status', requireAuth, async (req, res) => {
       });
     }
 
-    const updatedOrder = await prisma.order.update({ 
+    // ✅ MVP-1 1.1: Admin membatalkan permintaan konfirmasi → hapus item pending saja
+    if (currentOrder.status === 'APPROVAL' && newStatus === 'WORKING') {
+      await prisma.orderItem.deleteMany({ where: { orderId: id, isAdditional: true, approvedAt: null } });
+    }
+
+    const updatedOrder = await prisma.order.update({
       where: { id }, data: { status: newStatus }, include: { items: true }
     });
     res.json(updatedOrder);
@@ -367,6 +383,7 @@ app.get('/api/tracking/:token', async (req, res) => {
   res.json(order);
 });
 
+// ✅ MVP-1 1.1: Setujui → tandai pending sebagai approvedAt; Tolak → hapus pending saja
 app.put('/api/tracking/:token/approve', async (req, res) => {
   try {
     const token = req.params.token as string;
@@ -381,8 +398,15 @@ app.put('/api/tracking/:token/approve', async (req, res) => {
       return res.status(400).json({ error: 'Pesanan tidak dalam status menunggu konfirmasi.' });
     }
 
-    if (!accepted) {
-      await prisma.orderItem.deleteMany({ where: { orderId: order.id, isAdditional: true } });
+    if (accepted) {
+      await prisma.orderItem.updateMany({
+        where: { orderId: order.id, isAdditional: true, approvedAt: null },
+        data: { approvedAt: new Date() },
+      });
+    } else {
+      await prisma.orderItem.deleteMany({
+        where: { orderId: order.id, isAdditional: true, approvedAt: null },
+      });
     }
 
     const updatedOrder = await prisma.order.update({
@@ -401,13 +425,12 @@ app.put('/api/tracking/:token/approve', async (req, res) => {
 // ==========================================
 app.post('/api/checkout', requireAuth, async (req, res) => {
   try {
-    const { orderId, mode } = req.body; 
-    
+    const { orderId, mode } = req.body;
+
     if (!orderId) {
       return res.status(400).json({ error: 'Order ID diperlukan.' });
     }
 
-    // ✅ PERBAIKAN 2: Jangan percaya harga dari browser. Ambil dari DB.
     const order = await prisma.order.findUnique({
       where: { id: orderId }, include: { items: true }
     });
@@ -419,7 +442,7 @@ app.post('/api/checkout', requireAuth, async (req, res) => {
     const serviceAmount = order.items.filter(i => i.type === 'JASA').reduce((s, i) => s + i.price * i.qty, 0);
     const partsAmount = order.items.filter(i => i.type === 'SPAREPART').reduce((s, i) => s + i.price * i.qty, 0);
     const total = serviceAmount + partsAmount;
-    
+
     const mechanicId = order.mechanicId || undefined;
     const commission = await calculateCommission(mechanicId, serviceAmount, partsAmount);
 
@@ -443,8 +466,7 @@ app.post('/api/checkout', requireAuth, async (req, res) => {
         }
       });
 
-      // ✅ PERBAIKAN 1: JANGAN HAPUS ORDER. Ubah status jadi PAID.
-      await tx.order.update({ 
+      await tx.order.update({
         where: { id: orderId },
         data: { status: 'PAID', paidAt: new Date() }
       });
@@ -495,8 +517,7 @@ app.put('/api/commission', requireAuth, async (req, res) => {
         update: { servicePercent: Number(servicePercent), partsPercent: Number(partsPercent) },
         create: { id: 'global', servicePercent: Number(servicePercent), partsPercent: Number(partsPercent) }
       });
-      
-      // ✅ PERBAIKAN 7: Hanya hapus override jika user mengirimkan data overrides baru
+
       if (overrides && Object.keys(overrides).length > 0) {
         await tx.commissionOverride.deleteMany({});
         for (const [mechanicId, raw] of Object.entries(overrides)) {
