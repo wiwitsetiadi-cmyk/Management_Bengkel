@@ -38,7 +38,7 @@ export default function TrackingPage({ code, onApprove }: { code: string; onAppr
     };
 
     fetchOrder();
-    const interval = setInterval(fetchOrder, 10000); // Perbaikan: Polling setiap 10 detik
+    const interval = setInterval(fetchOrder, 10000);
 
     return () => {
       isMounted = false;
@@ -51,7 +51,9 @@ export default function TrackingPage({ code, onApprove }: { code: string; onAppr
 
   const currentIndex = steps.findIndex((step) => step.id === order.status);
   const total = order.items.reduce((sum, line) => sum + line.price * line.qty, 0);
-  const additionalItems = order.items.filter(i => i.isAdditional);
+
+  // ✅ MVP-1 1.1: Hanya tampilkan item pending (belum disetujui)
+  const pendingItems = order.items.filter(i => i.isAdditional && !i.approvedAt);
 
   const decideExtra = async (accepted: boolean) => {
     try {
@@ -60,11 +62,11 @@ export default function TrackingPage({ code, onApprove }: { code: string; onAppr
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ accepted }),
       });
-      
+
       if (res.ok) {
         const updatedData = await res.json();
-        setOrder(updatedData); // Perbaikan: Update state lokal agar UI langsung berubah
-        onApprove(accepted); 
+        setOrder(updatedData);
+        onApprove(accepted);
         setDecisionMessage(accepted ? 'Persetujuan diterima. Mekanik akan melanjutkan servis.' : 'Biaya tambahan ditolak. Mekanik akan melanjutkan tanpa item tambahan.');
       } else {
         setDecisionMessage('Gagal memproses persetujuan. Coba lagi.');
@@ -82,13 +84,13 @@ export default function TrackingPage({ code, onApprove }: { code: string; onAppr
       <div className="tracking-vehicle"><Bike size={17} /> {order.plate || 'Tanpa plat nomor'}</div>
       <p className="customer-tracking-issue">{order.issue}</p>
     </section>
-    
+
     <section className="tracking-card customer-tracking-card">
       <div className="tracking-card-heading">
         <div><span className="tracking-eyebrow">STATUS PESANAN</span><h2>{steps[currentIndex]?.label}</h2></div>
         <span className={`tracking-status-dot ${order.status.toLowerCase()}`} />
       </div>
-      
+
       <div className="tracking-stepper customer-tracking-stepper">
         {steps.map((step, index) => (
           <div className={`tracking-step ${index <= currentIndex ? 'complete' : ''} ${index === currentIndex ? 'current' : ''}`} key={step.id}>
@@ -97,17 +99,18 @@ export default function TrackingPage({ code, onApprove }: { code: string; onAppr
           </div>
         ))}
       </div>
-      
+
       <div className={`customer-status-banner ${order.status.toLowerCase()}`}>
         <span className="customer-status-icon">{order.status === 'READY' ? <Check size={17} /> : order.status === 'APPROVAL' ? <AlertCircle size={17} /> : <Clock3 size={17} />}</span>
         <p>{order.status === 'WORKING' && order.mechanic ? `Mekanik kami (${order.mechanic.name}) sedang mengerjakan kendaraan Anda.` : statusMessages[order.status]}</p>
       </div>
-      
+
       {order.status === 'APPROVAL' && (
         <div className="customer-approval-box">
           <div className="customer-approval-title"><AlertCircle size={19} /><strong>Menunggu Persetujuan Anda!</strong></div>
           <p>Mekanik menemukan kerusakan tambahan.</p>
-          {additionalItems.map(item => (
+          {/* ✅ MVP-1 1.1: Hanya render item pending */}
+          {pendingItems.map(item => (
             <div className="customer-extra-line" key={item.id}>
               <span>{item.name} (x{item.qty})</span><strong>{formatCurrency(item.price * item.qty)}</strong>
             </div>
@@ -118,9 +121,9 @@ export default function TrackingPage({ code, onApprove }: { code: string; onAppr
           </div>
         </div>
       )}
-      
+
       {decisionMessage && <div className="customer-decision-message"><Check size={15} /> {decisionMessage}</div>}
-      
+
       <div className="customer-cost-section">
         <div className="customer-section-heading"><div><span className="tracking-eyebrow">RINCIAN BIAYA</span><h2>Estimasi tagihan</h2></div><span>{order.items.length} item</span></div>
         <div className="customer-cost-table">
