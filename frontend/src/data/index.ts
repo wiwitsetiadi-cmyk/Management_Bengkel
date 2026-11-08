@@ -1,6 +1,6 @@
 // src/data/index.ts
 
-export type OrderStatus = 'QUEUE' | 'WORKING' | 'APPROVAL' | 'READY' | 'PAID'; // ✅ Tambah PAID
+export type OrderStatus = 'QUEUE' | 'WORKING' | 'APPROVAL' | 'READY' | 'PAID';
 export type OrderMode = 'service' | 'parts';
 export type ItemType = 'JASA' | 'SPAREPART';
 
@@ -37,6 +37,7 @@ export type OrderItem = {
   qty: number;
   sparepartId?: string | null;
   isAdditional: boolean;
+  approvedAt?: string | null; // ✅ MVP-1 1.1
 };
 
 export type Order = {
@@ -50,7 +51,7 @@ export type Order = {
   status: OrderStatus;
   color: string;
   createdAt: string;
-  paidAt?: string; // ✅ Tambah paidAt
+  paidAt?: string;
   mechanicId?: string;
   mechanic?: Mechanic;
   items: OrderItem[];
@@ -128,7 +129,7 @@ export function getStockAlerts(parts: Sparepart[]): Sparepart[] {
 export const allowedTransitions: Record<OrderStatus, OrderStatus[]> = {
   QUEUE: ['WORKING'],
   WORKING: ['APPROVAL', 'READY'],
-  APPROVAL: ['WORKING'], // Hanya via approve pelanggan
+  APPROVAL: ['WORKING'],
   READY: ['PAID'],
   PAID: [],
 };
@@ -138,7 +139,6 @@ export const columns: { id: OrderStatus; title: string; shortTitle: string; tone
   { id: 'WORKING', title: 'Dikerjakan', shortTitle: 'Dikerjakan', tone: 'blue' },
   { id: 'APPROVAL', title: 'Tunggu Konfirmasi', shortTitle: 'Konfirmasi', tone: 'amber' },
   { id: 'READY', title: 'Siap Bayar', shortTitle: 'Siap Bayar', tone: 'green' },
-  // PAID tidak dimasukkan ke kolom Kanban
 ];
 
 // ============================================================
