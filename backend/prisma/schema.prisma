@@ -5,7 +5,7 @@ generator client {
 }
 
 datasource db {
-  provider = "postgresql" // atau "sqlite" jika kamu pakai sqlite
+  provider = "postgresql"
   url      = env("DATABASE_URL")
 }
 
@@ -17,7 +17,7 @@ enum OrderStatus {
   WORKING
   APPROVAL
   READY
-  PAID // ✅ TAMBAHAN: Status baru untuk pesanan yang sudah dibayar
+  PAID
 }
 
 enum ItemType {
@@ -36,7 +36,7 @@ enum PaymentMethod {
 // ==========================================
 model Mechanic {
   id        String   @id @default(cuid())
-  code      String   @unique // Contoh: MK-001
+  code      String   @unique
   name      String
   initials  String
   color     String
@@ -70,7 +70,7 @@ model Sparepart {
 // ==========================================
 model Order {
   id            String      @id @default(cuid())
-  trackingToken String      @unique // Token rahasia untuk pelanggan
+  trackingToken String      @unique
   vehicle       String
   plate         String?
   customerName  String?
@@ -78,14 +78,13 @@ model Order {
   issue         String
   status        OrderStatus @default(QUEUE)
   color         String
-  
-  // Relasi ke Mekanik
+
   mechanicId    String?
   mechanic      Mechanic?   @relation(fields: [mechanicId], references: [id])
 
   createdAt     DateTime    @default(now())
   updatedAt     DateTime    @updatedAt
-  paidAt        DateTime?   // ✅ TAMBAHAN: Waktu pembayaran lunas
+  paidAt        DateTime?
 
   items         OrderItem[]
   transactions  Transaction[]
@@ -98,17 +97,17 @@ model OrderItem {
   id          String   @id @default(cuid())
   orderId     String
   order       Order    @relation(fields: [orderId], references: [id], onDelete: Cascade)
-  
+
   type        ItemType
   name        String
   price       Int
   qty         Int
-  
-  // Relasi ke Sparepart (Opsional, null jika ini Jasa)
+
   sparepartId String?
   sparepart   Sparepart? @relation(fields: [sparepartId], references: [id])
 
-  isAdditional Boolean @default(false) // Penanda biaya tambahan (extra)
+  isAdditional Boolean   @default(false) // Penanda biaya tambahan (extra)
+  approvedAt   DateTime?                 // ✅ MVP-1 1.1: null = menunggu persetujuan; terisi = sudah disetujui
 }
 
 // ==========================================
@@ -118,22 +117,21 @@ model Transaction {
   id          String        @id @default(cuid())
   orderId     String?
   order       Order?        @relation(fields: [orderId], references: [id], onDelete: SetNull)
-  
+
   date        DateTime      @default(now())
-  type        String        // "Servis" atau "Sparepart"
+  type        String
   method      PaymentMethod @default(TUNAI)
   total       Int
   serviceAmount Int
   partsAmount Int
   commission  Int
 
-  // Relasi ke Mekanik
   mechanicId  String?
   mechanic    Mechanic?     @relation(fields: [mechanicId], references: [id])
 }
 
 // ==========================================
-// 7. TABEL PENGATURAN KOMISI (Tetap dipertahankan)
+// 7. TABEL PENGATURAN KOMISI
 // ==========================================
 model CommissionSetting {
   id             String   @id @default("global")
