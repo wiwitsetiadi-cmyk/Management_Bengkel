@@ -65,7 +65,19 @@ const ALLOWED_TRANSITIONS: Record<string, string[]> = {
   PAID: []
 };
 
+// ✅ MVP-1 1.3: Error bisnis yang status HTTP-nya ditentukan pemanggil
+class HttpError extends Error {
+  status: number;
+  constructor(status: number, message: string) {
+    super(message);
+    this.status = status;
+  }
+}
+
 async function calculateCommission(mechanicId: string | undefined, serviceAmount: number, partsAmount: number): Promise<number> {
+  // ✅ MVP-1 1.3: Komisi 0 bila tidak ada mekanik
+  if (!mechanicId) return 0;
+
   let svcPct = 10;
   let ptsPct = 0;
 
@@ -75,12 +87,10 @@ async function calculateCommission(mechanicId: string | undefined, serviceAmount
     ptsPct = setting.partsPercent;
   }
 
-  if (mechanicId) {
-    const override = await prisma.commissionOverride.findUnique({ where: { mechanicId } });
-    if (override) {
-      if (override.servicePercent !== null) svcPct = override.servicePercent;
-      if (override.partsPercent !== null) ptsPct = override.partsPercent;
-    }
+  const override = await prisma.commissionOverride.findUnique({ where: { mechanicId } });
+  if (override) {
+    if (override.servicePercent !== null) svcPct = override.servicePercent;
+    if (override.partsPercent !== null) ptsPct = override.partsPercent;
   }
 
   return Math.round((serviceAmount * svcPct) / 100) + Math.round((partsAmount * ptsPct) / 100);
@@ -455,61 +465,108 @@ app.put('/api/tracking/:token/approve', async (req, res) => {
 // ==========================================
 // 8. ENDPOINT CHECKOUT (TRANSAKSI ACID)
 // ==========================================
+// ✅ MVP-1 1.3: Validasi paidAmount, klaim status atomik (409), stok atomik (400),
+// TransactionItem snapshot, error bisnis via HttpError, error tak terduga 500 generik.
 app.post('/api/checkout', requireAuth, async (req, res) => {
   try {
-    const { orderId, mode } = req.body;
+    const { mode, orderId, paidAmount } = req.body;
 
     if (!orderId) {
-      return res.status(400).json({ error: 'Order ID diperlukan.' });
+      throw new HttpError(400, 'Order ID diperlukan.');
+    }
+    if (!Number.isInteger(paidAmount) || paidAmount < 0) {
+      throw new HttpError(400, 'Nominal pembayaran tidak valid.');
     }
 
     const order = await prisma.order.findUnique({
-      where: { id: orderId }, include: { items: true }
+      where: { id: orderId },
+      include: { items: true }
     });
-
-    if (!order || order.status !== 'READY') {
-      return res.status(400).json({ error: 'Pesanan belum siap bayar atau tidak ditemukan.' });
+    if (!order) {
+      throw new HttpError(400, 'Pesanan tidak ditemukan.');
+    }
+    if (order.status !== 'READY') {
+      throw new HttpError(400, 'Pesanan belum siap bayar.');
     }
 
+    // Hitung total dari database — bukan dari client
     const serviceAmount = order.items.filter(i => i.type === 'JASA').reduce((s, i) => s + i.price * i.qty, 0);
     const partsAmount = order.items.filter(i => i.type === 'SPAREPART').reduce((s, i) => s + i.price * i.qty, 0);
     const total = serviceAmount + partsAmount;
+
+    if (paidAmount < total) {
+      const kurang = total - paidAmount;
+      throw new HttpError(400, `Pembayaran kurang Rp ${kurang.toLocaleString('id-ID')}.`);
+    }
+    const change = paidAmount - total;
 
     const mechanicId = order.mechanicId || undefined;
     const commission = await calculateCommission(mechanicId, serviceAmount, partsAmount);
 
     const result = await prisma.$transaction(async (tx) => {
+      // ✅ Klaim status atomik: hanya sukses bila masih READY
+      const claim = await tx.order.updateMany({
+        where: { id: orderId, status: 'READY' },
+        data: { status: 'PAID', paidAt: new Date() }
+      });
+      if (claim.count !== 1) {
+        throw new HttpError(409, 'Pesanan ini sudah dibayar atau tidak siap bayar.');
+      }
+
+      // ✅ Tolak bila masih ada item pending (safety — seharusnya sudah dicegah di 1.1)
+      const pendingCount = await tx.orderItem.count({
+        where: { orderId, isAdditional: true, approvedAt: null }
+      });
+      if (pendingCount > 0) {
+        throw new HttpError(400, 'Masih ada biaya tambahan yang menunggu persetujuan.');
+      }
+
+      // ✅ Pengurangan stok atomik
       for (const item of order.items) {
         if (item.type === 'SPAREPART' && item.sparepartId) {
-          const part = await tx.sparepart.findUnique({ where: { id: item.sparepartId } });
-          if (!part || part.stock < item.qty) {
-            throw new Error(`Stok ${item.name} tidak cukup!`);
-          }
-          await tx.sparepart.update({
-            where: { id: item.sparepartId }, data: { stock: { decrement: item.qty } }
+          const stockResult = await tx.sparepart.updateMany({
+            where: { id: item.sparepartId, stock: { gte: item.qty } },
+            data: { stock: { decrement: item.qty } }
           });
+          if (stockResult.count !== 1) {
+            throw new HttpError(400, `Stok ${item.name} tidak cukup!`);
+          }
         }
       }
 
+      // Buat transaksi
       const newTx = await tx.transaction.create({
         data: {
-          orderId: order.id, type: mode === 'service' ? 'Servis' : 'Sparepart', method: 'TUNAI',
-          total, serviceAmount, partsAmount, commission, mechanicId
+          orderId: order.id,
+          type: mode === 'service' ? 'Servis' : 'Sparepart',
+          method: 'TUNAI',
+          total, serviceAmount, partsAmount, commission, mechanicId,
+          paidAmount, changeAmount: change
         }
       });
 
-      await tx.order.update({
-        where: { id: orderId },
-        data: { status: 'PAID', paidAt: new Date() }
+      // ✅ Simpan snapshot item ke TransactionItem
+      await tx.transactionItem.createMany({
+        data: order.items.map(item => ({
+          transactionId: newTx.id,
+          type: item.type,
+          name: item.name,
+          price: item.price,
+          qty: item.qty,
+          sparepartId: item.sparepartId
+        }))
       });
 
       return newTx;
     });
 
-    res.json({ success: true, transaction: result });
+    res.json({ success: true, transaction: result, change });
   } catch (error: any) {
+    if (error instanceof HttpError) {
+      return res.status(error.status).json({ error: error.message });
+    }
     console.error('Checkout Error:', error);
-    res.status(400).json({ error: error.message || 'Gagal memproses pembayaran' });
+    res.status(500).json({ error: 'Terjadi kesalahan internal pada server.' });
   }
 });
 
@@ -518,7 +575,8 @@ app.post('/api/checkout', requireAuth, async (req, res) => {
 // ==========================================
 app.get('/api/transactions', requireAuth, async (req, res) => {
   const txs = await prisma.transaction.findMany({
-    include: { mechanic: true }, orderBy: { date: 'desc' }
+    include: { mechanic: true, items: true },
+    orderBy: { date: 'desc' }
   });
   res.json(txs);
 });

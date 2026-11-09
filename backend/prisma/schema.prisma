@@ -125,9 +125,28 @@ model Transaction {
   serviceAmount Int
   partsAmount Int
   commission  Int
+  paidAmount  Int           @default(0) // ✅ MVP-1 1.3
+  changeAmount Int          @default(0) // ✅ MVP-1 1.3
 
   mechanicId  String?
   mechanic    Mechanic?     @relation(fields: [mechanicId], references: [id])
+
+  items       TransactionItem[] // ✅ MVP-1 1.3
+}
+
+// ==========================================
+// 6b. TABEL TRANSACTION ITEM (snapshot saat checkout)
+// ==========================================
+model TransactionItem {
+  id            String      @id @default(cuid())
+  transactionId String
+  transaction   Transaction @relation(fields: [transactionId], references: [id], onDelete: Cascade)
+
+  type        ItemType
+  name        String
+  price       Int
+  qty         Int
+  sparepartId String?     // ✅ MVP-1 1.3: snapshot, tanpa relasi ke Sparepart
 }
 
 // ==========================================
