@@ -142,43 +142,42 @@ function App() {
     setSearchFocused(false);
   };
 
-const moveOrder = async (orderId: string, status: OrderStatus) => {
-  const order = orders.find((item) => item.id === orderId);
-  if (!order || order.status === status || !allowedTransitions[order.status].includes(status)) return;
+  const moveOrder = async (orderId: string, status: OrderStatus) => {
+    const order = orders.find((item) => item.id === orderId);
+    if (!order || order.status === status || !allowedTransitions[order.status].includes(status)) return;
 
-  // ✅ MVP-1 1.2: Drag ke APPROVAL tidak bisa membawa item → arahkan ke drawer
-  if (status === 'APPROVAL') {
-    showToast('Buka detail pesanan untuk menambah biaya, lalu minta konfirmasi.');
-    return;
-  }
+    // ✅ MVP-1 1.2: Drag ke APPROVAL tidak bisa membawa item → arahkan ke drawer
+    if (status === 'APPROVAL') {
+      showToast('Buka detail pesanan untuk menambah biaya, lalu minta konfirmasi.');
+      return;
+    }
 
-  // ✅ MVP-1 1.1: Hanya blokir READY bila ada item pending (belum disetujui).
-  // Item tambahan yang sudah disetujui TIDAK memblokir lagi.
-  if (status === 'READY' && order.items.some(i => i.isAdditional && !i.approvedAt)) {
-    showToast('Masih ada biaya tambahan yang menunggu persetujuan pelanggan.');
-    return;
-  }
+    // ✅ MVP-1 1.1: Hanya blokir READY bila ada item pending (belum disetujui).
+    if (status === 'READY' && order.items.some(i => i.isAdditional && !i.approvedAt)) {
+      showToast('Masih ada biaya tambahan yang menunggu persetujuan pelanggan.');
+      return;
+    }
 
-  const prevOrders = [...orders];
-  setOrders((current) => current.map((item) => (item.id === orderId ? { ...item, status } : item)));
-  setDropTarget(null);
+    const prevOrders = [...orders];
+    setOrders((current) => current.map((item) => (item.id === orderId ? { ...item, status } : item)));
+    setDropTarget(null);
 
-  try {
-    const res = await fetchApi(`/api/orders/${orderId}/status`, {
-      method: 'PUT',
-      body: JSON.stringify({ status }),
-    });
-    if (!res.ok) {
-      const data = await res.json();
-      showToast(data.error || 'Gagal update status');
+    try {
+      const res = await fetchApi(`/api/orders/${orderId}/status`, {
+        method: 'PUT',
+        body: JSON.stringify({ status }),
+      });
+      if (!res.ok) {
+        const data = await res.json();
+        showToast(data.error || 'Gagal update status');
+        setOrders(prevOrders);
+      }
+    } catch (error) {
+      console.error(error);
+      showToast('Gagal update ke database');
       setOrders(prevOrders);
     }
-  } catch (error) {
-    console.error(error);
-    showToast('Gagal update ke database');
-    setOrders(prevOrders);
-  }
-};
+  };
 
   const handleDrop = (status: OrderStatus) => {
     if (draggedId) moveOrder(draggedId, status);
@@ -305,13 +304,16 @@ const moveOrder = async (orderId: string, status: OrderStatus) => {
     navigateView('cashier');
   };
 
+  // ✅ MVP-1 1.3: Kirim paidAmount, pakai change dari server untuk struk
   const handlePaid = async (selection: CashierSelection) => {
+    const paidAmount = selection.payments?.reduce((sum, p) => sum + p.amount, 0) || 0;
     try {
       const res = await fetchApi('/api/checkout', {
         method: 'POST',
         body: JSON.stringify({
           orderId: selection.order?.id || undefined,
           mode: selection.mode,
+          paidAmount,
         }),
       });
 
@@ -321,7 +323,8 @@ const moveOrder = async (orderId: string, status: OrderStatus) => {
       await fetchData();
 
       setCashierSelection(null);
-      setFinalReceipt(selection);
+      // ✅ MVP-1 1.3: Gunakan `change` dari server, bukan hitungan client
+      setFinalReceipt({ ...selection, change: data.change });
       setCart([]);
     } catch (error) {
       showToast(error instanceof Error ? error.message : 'Terjadi kesalahan saat menyimpan transaksi');
