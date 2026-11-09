@@ -69,7 +69,7 @@ export type TransactionItem = {
 
 export type Transaction = {
   id: string;
-  orderId?: string;
+  orderId?: string | null;          // ✅ MVP-1 1.4: null untuk mode parts
   date: string;
   type: string;
   method: 'TUNAI' | 'QRIS' | 'SPLIT';
@@ -80,8 +80,8 @@ export type Transaction = {
   paidAmount: number;         // ✅ MVP-1 1.3
   changeAmount: number;       // ✅ MVP-1 1.3
   items: TransactionItem[];   // ✅ MVP-1 1.3
-  mechanicId?: string;
-  mechanic?: Mechanic;
+  mechanicId?: string | null; // ✅ MVP-1 1.4: null untuk mode parts
+  mechanic?: Mechanic | null; // ✅ MVP-1 1.4: null untuk mode parts
 };
 
 export type CashierLine = {
