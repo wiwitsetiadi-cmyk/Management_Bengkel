@@ -16,12 +16,19 @@ export default function CashierPage({ selection, orders, onSelectOrder, onPaid }
   const formatInputValue = (value: number) => value ? formatRupiah(value) : '';
   const updatePayment = (amount: number) => setPayments([{ id: 1, method: 'Manual', amount }]);
   
-  const finishPayment = async () => { 
-    if (selection) { 
-      setIsProcessing(true);
-      await onPaid({ ...selection, payments: payments.filter((p) => p.amount > 0), change }); 
+  // ✅ MVP-1 1.5: try/catch/finally agar tombol Lunas tidak macet saat checkout gagal.
+  // Toast error sudah ditampilkan di handlePaid (App.tsx) — catch kosong cukup.
+  const finishPayment = async () => {
+    if (!selection) return;
+    setIsProcessing(true);
+    try {
+      await onPaid({ ...selection, payments: payments.filter((p) => p.amount > 0), change });
+    } catch {
+      // Toast sudah ditampilkan di handlePaid
+      setConfirmOpen(false);
+    } finally {
       setIsProcessing(false);
-    } 
+    }
   };
 
   if (!selection) return (
