@@ -57,6 +57,16 @@ export type Order = {
   items: OrderItem[];
 };
 
+// ✅ MVP-1 1.3: snapshot item di dalam Transaction
+export type TransactionItem = {
+  id: string;
+  type: ItemType;
+  name: string;
+  price: number;
+  qty: number;
+  sparepartId?: string | null;
+};
+
 export type Transaction = {
   id: string;
   orderId?: string;
@@ -67,6 +77,9 @@ export type Transaction = {
   serviceAmount: number;
   partsAmount: number;
   commission: number;
+  paidAmount: number;         // ✅ MVP-1 1.3
+  changeAmount: number;       // ✅ MVP-1 1.3
+  items: TransactionItem[];   // ✅ MVP-1 1.3
   mechanicId?: string;
   mechanic?: Mechanic;
 };
