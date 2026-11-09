@@ -71,6 +71,8 @@ function App() {
   const [orderSearch, setOrderSearch] = useState('');
   const [searchFocused, setSearchFocused] = useState(false);
   const [trackingCode, setTrackingCode] = useState<string | null>(trackingMatch ? trackingMatch[1] : null);
+  // ✅ MVP-1 1.4: counter agar key CashierPage unik tiap sesi parts
+  const [partsSession, setPartsSession] = useState(0);
 
   const showToast = useCallback((message: string) => {
     setToast(message);
@@ -299,22 +301,23 @@ function App() {
     const order = { id: '', vehicle: 'Sparepart langsung', issue: 'Pembelian sparepart', status: 'READY', color: '#DCEBE9', trackingToken: '', createdAt: new Date().toISOString(), items: [] } as unknown as Order;
     const lines = cart.map((item) => ({ id: item.id, name: item.name, type: 'SPAREPART' as const, qty: item.qty, price: item.price }));
 
+    // ✅ MVP-1 1.4: naikkan counter agar key CashierPage unik per sesi parts
+    setPartsSession((s) => s + 1);
     setCashierSelection({ mode: 'parts', order, lines, total: lines.reduce((sum, line) => sum + line.price * line.qty, 0) });
     setOrderDialogOpen(false);
     navigateView('cashier');
   };
 
-  // ✅ MVP-1 1.3: Kirim paidAmount, pakai change dari server untuk struk
+  // ✅ MVP-1 1.3 + 1.4: mode parts kirim items; mode service kirim orderId. Gunakan `change` dari server.
   const handlePaid = async (selection: CashierSelection) => {
     const paidAmount = selection.payments?.reduce((sum, p) => sum + p.amount, 0) || 0;
+    const body = selection.mode === 'parts'
+      ? { mode: 'parts', items: selection.lines.map(l => ({ sparepartId: l.id, qty: l.qty })), paidAmount }
+      : { mode: 'service', orderId: selection.order?.id || undefined, paidAmount };
     try {
       const res = await fetchApi('/api/checkout', {
         method: 'POST',
-        body: JSON.stringify({
-          orderId: selection.order?.id || undefined,
-          mode: selection.mode,
-          paidAmount,
-        }),
+        body: JSON.stringify(body),
       });
 
       const data = await res.json();
@@ -358,6 +361,11 @@ function App() {
   if (!authUser) return <AdminLogin onLogin={handleLogin} />;
 
   const avatarInitials = authUser.name.split(' ').map((w) => w[0]).join('').slice(0, 2).toUpperCase();
+
+  // ✅ MVP-1 1.4: key CashierPage unik per sesi parts, agar form tidak basi saat buka parts lagi
+  const cashierKey = cashierSelection?.mode === 'parts'
+    ? `parts-${partsSession}`
+    : (cashierSelection?.order?.id || 'empty');
 
   return (
     <div className="app-shell">
@@ -405,7 +413,7 @@ function App() {
 
         <main className="main-content">
           {activeView === 'cashier' ? (
-            <CashierPage key={cashierSelection?.order?.id || 'empty'} selection={cashierSelection} orders={orders} onSelectOrder={openCashierForOrder} onPaid={handlePaid} />
+            <CashierPage key={cashierKey} selection={cashierSelection} orders={orders} onSelectOrder={openCashierForOrder} onPaid={handlePaid} />
           ) : activeView === 'settings' ? (
             <SettingsPage showToast={showToast} mechanics={mechanics} setMechanics={setMechanics} />
           ) : activeView === 'reports' ? (
