@@ -465,17 +465,107 @@ app.put('/api/tracking/:token/approve', async (req, res) => {
 // ==========================================
 // 8. ENDPOINT CHECKOUT (TRANSAKSI ACID)
 // ==========================================
-// ✅ MVP-1 1.3: Validasi paidAmount, klaim status atomik (409), stok atomik (400),
-// TransactionItem snapshot, error bisnis via HttpError, error tak terduga 500 generik.
+// ✅ MVP-1 1.3: mode 'service' — validasi paidAmount, klaim status atomik (409),
+//    stok atomik (400), TransactionItem snapshot, error bisnis via HttpError.
+// ✅ MVP-1 1.4: mode 'parts' — harga dari DB, merge sparepartId, orderId/mechanicId null, komisi 0.
 app.post('/api/checkout', requireAuth, async (req, res) => {
   try {
-    const { mode, orderId, paidAmount } = req.body;
+    const { mode, orderId, paidAmount, items } = req.body;
 
-    if (!orderId) {
-      throw new HttpError(400, 'Order ID diperlukan.');
-    }
     if (!Number.isInteger(paidAmount) || paidAmount < 0) {
       throw new HttpError(400, 'Nominal pembayaran tidak valid.');
+    }
+
+    // =============================================
+    // 8a. MODE PARTS — pembelian sparepart langsung
+    // =============================================
+    if (mode === 'parts') {
+      if (!Array.isArray(items) || items.length === 0) {
+        throw new HttpError(400, 'Item pembelian tidak boleh kosong.');
+      }
+
+      // Validasi + merge sparepartId yang duplikat
+      const merged = new Map<string, number>();
+      for (const it of items) {
+        if (!it?.sparepartId || typeof it.sparepartId !== 'string' || !it.sparepartId.trim()) {
+          throw new HttpError(400, 'Data item tidak valid.');
+        }
+        if (!Number.isInteger(it.qty) || it.qty <= 0) {
+          throw new HttpError(400, 'Jumlah item harus bilangan bulat lebih dari 0.');
+        }
+        merged.set(it.sparepartId, (merged.get(it.sparepartId) || 0) + it.qty);
+      }
+
+      const partIds = Array.from(merged.keys());
+      const parts = await prisma.sparepart.findMany({ where: { id: { in: partIds } } });
+      if (parts.length !== partIds.length) {
+        throw new HttpError(400, 'Ada sparepart yang tidak ditemukan.');
+      }
+      const partMap = new Map(parts.map(p => [p.id, p]));
+
+      // Harga dari DB, bukan dari client
+      let partsAmount = 0;
+      for (const [id, qty] of merged) {
+        partsAmount += partMap.get(id)!.price * qty;
+      }
+      const total = partsAmount;
+
+      if (paidAmount < total) {
+        const kurang = total - paidAmount;
+        throw new HttpError(400, `Pembayaran kurang Rp ${kurang.toLocaleString('id-ID')}.`);
+      }
+      const change = paidAmount - total;
+
+      const result = await prisma.$transaction(async (tx) => {
+        // Pengurangan stok atomik (sama seperti mode service)
+        for (const [id, qty] of merged) {
+          const stockResult = await tx.sparepart.updateMany({
+            where: { id, stock: { gte: qty } },
+            data: { stock: { decrement: qty } }
+          });
+          if (stockResult.count !== 1) {
+            throw new HttpError(400, `Stok ${partMap.get(id)!.name} tidak cukup!`);
+          }
+        }
+
+        // Transaksi tanpa Order & tanpa Mekanik
+        const newTx = await tx.transaction.create({
+          data: {
+            orderId: null,
+            type: 'Sparepart',
+            method: 'TUNAI',
+            total,
+            serviceAmount: 0,
+            partsAmount,
+            commission: 0,
+            mechanicId: null,
+            paidAmount,
+            changeAmount: change
+          }
+        });
+
+        await tx.transactionItem.createMany({
+          data: Array.from(merged.entries()).map(([id, qty]) => ({
+            transactionId: newTx.id,
+            type: 'SPAREPART',
+            name: partMap.get(id)!.name,
+            price: partMap.get(id)!.price,
+            qty,
+            sparepartId: id
+          }))
+        });
+
+        return newTx;
+      });
+
+      return res.json({ success: true, transaction: result, change });
+    }
+
+    // =============================================
+    // 8b. MODE SERVICE — alur checkout pesanan (tidak berubah)
+    // =============================================
+    if (!orderId) {
+      throw new HttpError(400, 'Order ID diperlukan.');
     }
 
     const order = await prisma.order.findUnique({
