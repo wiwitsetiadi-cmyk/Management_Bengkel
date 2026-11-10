@@ -1118,6 +1118,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brand-700);
 .tracking-status-dot.working { background: #4e9aaa; }
 .tracking-status-dot.approval { background: #e7b500; }
 .tracking-status-dot.ready { background: #20a65a; }
+.tracking-status-dot.paid { background: #20a65a; }
 .tracking-stepper { margin: 28px 0; display: grid; grid-template-columns: repeat(4, 1fr); gap: 8px; }
 .tracking-step { min-width: 0; position: relative; display: flex; flex-direction: column; gap: 7px; }
 .tracking-step:not(:last-child)::after { content: ''; position: absolute; top: 14px; left: 30px; width: calc(100% - 22px); height: 2px; background: var(--neutral-300); }
@@ -1148,9 +1149,11 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brand-700);
 .customer-status-banner.queue, .customer-status-banner.working { background: var(--brand-100); }
 .customer-status-banner.approval { background: #fff8df; }
 .customer-status-banner.ready { background: #eaf8ee; }
+.customer-status-banner.paid { background: #eaf8ee; }
 .customer-status-icon { width: 26px; height: 26px; display: grid; place-items: center; flex: 0 0 auto; color: var(--brand-700); border-radius: 7px; background: white; }
 .customer-status-banner.approval .customer-status-icon { color: #a17a00; }
 .customer-status-banner.ready .customer-status-icon { color: var(--success); }
+.customer-status-banner.paid .customer-status-icon { color: var(--success); }
 .customer-approval-box { margin-top: 16px; padding: 16px; border: 1px solid #f0d46d; border-radius: 11px; background: #fff9e5; }
 .customer-approval-title { display: flex; align-items: center; gap: 7px; color: #7d6000; font-size: 13px; }
 .customer-approval-title svg { color: #bd8e00; }
@@ -1163,6 +1166,7 @@ button:focus-visible, input:focus-visible { outline: 2px solid var(--brand-700);
 .customer-approve-button:hover { background: #14763d; }
 .customer-reject-button { color: #7c5151; background: #f3e5e5; }
 .customer-reject-button:hover { background: #ebd4d4; }
+.customer-approval-actions button:disabled { opacity: .45; cursor: not-allowed; }
 .customer-decision-message { margin-top: 14px; padding: 11px 12px; display: flex; align-items: flex-start; gap: 7px; color: #14763d; border-radius: 9px; background: #eaf8ee; font-size: 11px; line-height: 1.4; }
 .customer-cost-section { margin-top: 24px; }
 .customer-section-heading { margin-bottom: 10px; display: flex; align-items: flex-end; justify-content: space-between; gap: 10px; }
