@@ -335,26 +335,9 @@ function App() {
     }
   };
 
-  const handleCustomerApproval = async (token: string, accepted: boolean) => {
-    try {
-      const res = await fetchApi(`/api/tracking/${token}/approve`, {
-        method: 'PUT',
-        body: JSON.stringify({ accepted }),
-      });
-
-      const data = await res.json();
-      if (!res.ok) throw new Error('Gagal memproses persetujuan');
-
-      setOrders((current) => current.map(o => o.trackingToken === token ? data : o));
-      showToast(accepted ? 'Biaya tambahan disetujui' : 'Biaya tambahan ditolak');
-    } catch (error) {
-      console.error(error);
-    }
-  };
-
   if (trackingCode) {
     return (
-      <TrackingPage code={trackingCode} onApprove={(accepted) => handleCustomerApproval(trackingCode, accepted)} />
+      <TrackingPage code={trackingCode} />
     );
   }
 
