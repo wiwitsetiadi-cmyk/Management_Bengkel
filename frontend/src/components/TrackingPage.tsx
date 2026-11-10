@@ -21,19 +21,24 @@ const statusMessages: Record<string, string> = {
 
 const formatCurrency = (amount: number) => `Rp ${new Intl.NumberFormat('id-ID').format(amount)}`;
 
-export default function TrackingPage({ code, onApprove }: { code: string; onApprove: (accepted: boolean) => void }) {
+// ✅ MVP-1 1.6: hapus prop onApprove, tambah state submitting
+export default function TrackingPage({ code }: { code: string }) {
   const [order, setOrder] = useState<Order | null>(null);
   const [loading, setLoading] = useState(true);
   const [decisionMessage, setDecisionMessage] = useState('');
+  const [submitting, setSubmitting] = useState(false);
 
   useEffect(() => {
     let isMounted = true;
 
     const fetchOrder = () => {
       fetch(`${API_BASE}/api/tracking/${code}`)
-        .then(res => res.ok ? res.json() : Promise.reject())
-        .then(data => { if (isMounted) setOrder(data); })
-        .catch(() => { if (isMounted) setOrder(null); })
+        .then(res => {
+          if (res.status === 404) { if (isMounted) setOrder(null); return null; }
+          return res.ok ? res.json() : null;
+        })
+        .then(data => { if (isMounted && data) setOrder(data); })
+        .catch(() => { /* ✅ MVP-1 1.6: gagal sementara, pertahankan data terakhir */ })
         .finally(() => { if (isMounted) setLoading(false); });
     };
 
@@ -49,13 +54,18 @@ export default function TrackingPage({ code, onApprove }: { code: string; onAppr
   if (loading) return <div style={{ textAlign: 'center', padding: 50 }}>Memuat data...</div>;
   if (!order) return <main className="tracking-shell"><section className="tracking-not-found"><div className="tracking-brand"><Wrench size={18} /> BENGKEL MVP</div><div className="tracking-empty-icon"><AlertCircle size={28} /></div><h1>Tiket tidak valid</h1><p>Periksa kembali link pada tiket pesanan Anda.</p></section></main>;
 
-  const currentIndex = steps.findIndex((step) => step.id === order.status);
+  // ✅ MVP-1 1.6
+  const isPaid = order.status === 'PAID';
+  const currentIndex = isPaid ? steps.length : steps.findIndex((step) => step.id === order.status);
+  
   const total = order.items.reduce((sum, line) => sum + line.price * line.qty, 0);
 
   // ✅ MVP-1 1.1: Hanya tampilkan item pending (belum disetujui)
   const pendingItems = order.items.filter(i => i.isAdditional && !i.approvedAt);
 
   const decideExtra = async (accepted: boolean) => {
+    if (submitting) return;
+    setSubmitting(true);
     try {
       const res = await fetch(`${API_BASE}/api/tracking/${code}/approve`, {
         method: 'PUT',
@@ -66,13 +76,14 @@ export default function TrackingPage({ code, onApprove }: { code: string; onAppr
       if (res.ok) {
         const updatedData = await res.json();
         setOrder(updatedData);
-        onApprove(accepted);
         setDecisionMessage(accepted ? 'Persetujuan diterima. Mekanik akan melanjutkan servis.' : 'Biaya tambahan ditolak. Mekanik akan melanjutkan tanpa item tambahan.');
       } else {
         setDecisionMessage('Gagal memproses persetujuan. Coba lagi.');
       }
     } catch {
       setDecisionMessage('Tidak dapat terhubung ke server.');
+    } finally {
+      setSubmitting(false);
     }
   };
 
@@ -87,7 +98,7 @@ export default function TrackingPage({ code, onApprove }: { code: string; onAppr
 
     <section className="tracking-card customer-tracking-card">
       <div className="tracking-card-heading">
-        <div><span className="tracking-eyebrow">STATUS PESANAN</span><h2>{steps[currentIndex]?.label}</h2></div>
+        <div><span className="tracking-eyebrow">STATUS PESANAN</span><h2>{isPaid ? 'Lunas' : steps[currentIndex]?.label}</h2></div>
         <span className={`tracking-status-dot ${order.status.toLowerCase()}`} />
       </div>
 
@@ -101,7 +112,7 @@ export default function TrackingPage({ code, onApprove }: { code: string; onAppr
       </div>
 
       <div className={`customer-status-banner ${order.status.toLowerCase()}`}>
-        <span className="customer-status-icon">{order.status === 'READY' ? <Check size={17} /> : order.status === 'APPROVAL' ? <AlertCircle size={17} /> : <Clock3 size={17} />}</span>
+        <span className="customer-status-icon">{order.status === 'READY' || isPaid ? <Check size={17} /> : order.status === 'APPROVAL' ? <AlertCircle size={17} /> : <Clock3 size={17} />}</span>
         <p>{order.status === 'WORKING' && order.mechanic ? `Mekanik kami (${order.mechanic.name}) sedang mengerjakan kendaraan Anda.` : statusMessages[order.status]}</p>
       </div>
 
@@ -116,8 +127,8 @@ export default function TrackingPage({ code, onApprove }: { code: string; onAppr
             </div>
           ))}
           <div className="customer-approval-actions">
-            <button className="customer-approve-button" onClick={() => decideExtra(true)}><Check size={16} /> Setuju & Lanjutkan</button>
-            <button className="customer-reject-button" onClick={() => decideExtra(false)}><X size={16} /> Tolak</button>
+            <button className="customer-approve-button" disabled={submitting} onClick={() => decideExtra(true)}><Check size={16} /> Setuju & Lanjutkan</button>
+            <button className="customer-reject-button" disabled={submitting} onClick={() => decideExtra(false)}><X size={16} /> Tolak</button>
           </div>
         </div>
       )}
