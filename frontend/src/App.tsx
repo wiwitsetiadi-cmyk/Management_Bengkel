@@ -47,7 +47,8 @@ function App() {
   });
 
   const [toast, setToast] = useState<string | null>(null);
-  const [selectedOrder, setSelectedOrder] = useState<Order | null>(null);
+  // ✅ MVP-1 1.7: Simpan ID, bukan objek, agar drawer selalu ter-update dengan data terbaru
+  const [selectedOrderId, setSelectedOrderId] = useState<string | null>(null);
   const [draggedId, setDraggedId] = useState<string | null>(null);
   const [dropTarget, setDropTarget] = useState<OrderStatus | null>(null);
   const [sidebarOpen, setSidebarOpen] = useState(false);
@@ -85,8 +86,14 @@ function App() {
     services, setServices,
     transactions,
     mechanics, setMechanics,
-    fetchData
+    fetchData,
+    refreshOrders // ✅ MVP-1 1.7
   } = useData(showToast);
+
+  // ✅ MVP-1 1.7: Turunkan objek order terpilih dari state orders terbaru
+  const selectedOrder = useMemo(() => {
+    return orders.find(o => o.id === selectedOrderId) || null;
+  }, [orders, selectedOrderId]);
 
   const stockAlerts = useMemo(() => getStockAlerts(parts), [parts]);
 
@@ -111,6 +118,20 @@ function App() {
   useEffect(() => {
     if (authUser) fetchData();
   }, [authUser, fetchData]);
+
+  // ✅ MVP-1 1.7: Polling 15 detik, hanya saat tab visible dan admin login
+  useEffect(() => {
+    if (!authUser) return;
+
+    const tick = () => {
+      if (document.visibilityState === 'visible') {
+        refreshOrders();
+      }
+    };
+
+    const interval = setInterval(tick, 15000);
+    return () => clearInterval(interval);
+  }, [authUser, refreshOrders]);
 
   useEffect(() => {
     const handlePop = () => {
@@ -139,7 +160,7 @@ function App() {
   const visibleOrders = orderSearch.trim() ? searchResults : orders;
 
   const openSearchResult = (order: Order) => {
-    setSelectedOrder(order);
+    setSelectedOrderId(order.id); // ✅ MVP-1 1.7
     setOrderSearch('');
     setSearchFocused(false);
   };
@@ -201,7 +222,7 @@ function App() {
         return;
       }
 
-      setSelectedOrder(null);
+      setSelectedOrderId(null); // ✅ MVP-1 1.7
       setOrders((current) => current.map((o) => (o.id === selectedOrder.id ? data : o)));
     } catch (error) {
       console.error(error);
@@ -423,7 +444,7 @@ function App() {
               return <div key={column.id} className={`kanban-column ${dropTarget === column.id ? 'drop-active' : ''}`} onDragOver={(event) => { event.preventDefault(); setDropTarget(column.id); }} onDragLeave={() => setDropTarget(null)} onDrop={() => handleDrop(column.id)}>
                 <div className="column-header"><div className="column-title"><span className={`column-marker ${column.tone}`} /><h3>{column.title}</h3><span className="count-pill">{columnOrders.length}</span></div></div>
                 <div className="column-body">
-                  {columnOrders.length === 0 ? <EmptyColumn /> : columnOrders.map((order) => <OrderCard key={order.id} order={order} onClick={() => setSelectedOrder(order)} onPay={order.status === 'READY' ? () => openCashierForOrder(order) : undefined} onDragStart={() => setDraggedId(order.id)} onDragEnd={() => { setDraggedId(null); setDropTarget(null); }} isDragging={draggedId === order.id} />)}
+                  {columnOrders.length === 0 ? <EmptyColumn /> : columnOrders.map((order) => <OrderCard key={order.id} order={order} onClick={() => setSelectedOrderId(order.id)} onPay={order.status === 'READY' ? () => openCashierForOrder(order) : undefined} onDragStart={() => setDraggedId(order.id)} onDragEnd={() => { setDraggedId(null); setDropTarget(null); }} isDragging={draggedId === order.id} />)}
                 </div>
               </div>;
             })}
@@ -432,7 +453,8 @@ function App() {
         </main>
       </div>
 
-      {selectedOrder && <OrderDrawer order={selectedOrder} parts={parts} onClose={() => setSelectedOrder(null)} onStatusChange={updateSelectedStatus} />}
+      {/* ✅ MVP-1 1.7: Key berubah jika status berubah, sehingga form di drawer ter-reset */}
+      {selectedOrder && <OrderDrawer key={`${selectedOrder.id}-${selectedOrder.status}`} order={selectedOrder} parts={parts} onClose={() => setSelectedOrderId(null)} onStatusChange={updateSelectedStatus} />}
       {orderDialogOpen && <NewOrderDialog mode={orderMode} serviceForm={serviceForm} mechanicError={mechanicError} partSearch={partSearch} filteredParts={filteredParts} cart={cart} cartTotal={cartTotal} mechanics={mechanics} services={services} onClose={() => setOrderDialogOpen(false)} onModeChange={setOrderMode} onFieldChange={updateServiceField} onMechanicBlur={() => setMechanicError(!serviceForm.mechanicId)} onPartSearch={setPartSearch} onAddPart={addPart} onChangeQty={changeQty} onRemovePart={removePart} onSaveService={saveServiceOrder} onOpenCashier={openCashier} />}
       {ticketPreview && <TicketPreview order={ticketPreview} onClose={() => setTicketPreview(null)} />}
       {finalReceipt && <FinalReceipt selection={finalReceipt} onClose={() => setFinalReceipt(null)} onNewTransaction={() => { setFinalReceipt(null); navigateView('cashier'); setCashierSelection(null); }} />}
