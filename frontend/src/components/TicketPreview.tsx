@@ -48,13 +48,14 @@ export default function TicketPreview({ order, onClose }: { order: Order; onClos
               <div><span>Plat</span><strong>{order.plate || '-'}</strong></div>
             </div>
             <div className="receipt-service-line"><span>Keluhan / servis</span><strong>{order.issue}</strong></div>
-
+            
             <div className="receipt-qr">
-              <QRCodeSVG value={trackingUrl} size={108} />
+              {/* Menambahkan fgColor="#111" untuk mempertahankan warna desain lama */}
+              <QRCodeSVG value={trackingUrl} size={108} fgColor="#111" />
               <strong>{trackingUrl}</strong>
               <span>Scan untuk pantau progres servis Anda.<br />Tanpa instal, tanpa login.</span>
             </div>
-
+            
             <div className="receipt-rule" />
             <p className="receipt-note">Simpan tiket ini untuk pengambilan kendaraan.</p>
             <footer>Terima kasih telah mempercayakan motor Anda.</footer>
