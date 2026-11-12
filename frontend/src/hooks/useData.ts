@@ -31,6 +31,18 @@ export function useData(showToast: (msg: string) => void) {
     }
   }, [showToast]);
 
+  // ✅ MVP-1 1.7: refreshOrders untuk polling dasbor. Tanpa toast, gagal = state lama.
+  const refreshOrders = useCallback(async () => {
+    try {
+      const res = await fetchApi('/api/orders');
+      if (res.ok) {
+        setOrders(await res.json());
+      }
+    } catch (error) {
+      // Diamkan jika gagal, pertahankan state lama
+    }
+  }, []);
+
   // Kembalikan semua state dan fungsi agar bisa dipakai di App.tsx
   return {
     orders, setOrders,
@@ -38,6 +50,7 @@ export function useData(showToast: (msg: string) => void) {
     services, setServices,
     transactions, setTransactions,
     mechanics, setMechanics,
-    fetchData
+    fetchData,
+    refreshOrders // ✅ MVP-1 1.7
   };
 }
