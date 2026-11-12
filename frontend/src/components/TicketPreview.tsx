@@ -1,21 +1,19 @@
 import { useState } from 'react';
 import { X, Bike, FileText, Printer, Check } from 'lucide-react';
+import { QRCodeSVG } from 'qrcode.react';
 import type { Order } from '../data';
 
 export default function TicketPreview({ order, onClose }: { order: Order; onClose: () => void }) {
   const [paperWidth, setPaperWidth] = useState<'58' | '80'>('80');
   const [copied, setCopied] = useState(false);
   const trackingUrl = `${window.location.origin}/tracking/${order.trackingToken}`;
-  
-  // Perbaikan: Generate URL QR Code menggunakan API gratis
-  const qrImageUrl = `https://api.qrserver.com/v1/create-qr-code/?size=150x150&data=${encodeURIComponent(trackingUrl)}`;
-  
+
   const copyTrackingLink = async () => {
     await navigator.clipboard.writeText(trackingUrl);
     setCopied(true);
     window.setTimeout(() => setCopied(false), 2200);
   };
-  
+
   return (
     <div className="ticket-preview-backdrop" onClick={onClose}>
       <section className="ticket-preview-dialog" onClick={(event) => event.stopPropagation()}>
@@ -50,13 +48,13 @@ export default function TicketPreview({ order, onClose }: { order: Order; onClos
               <div><span>Plat</span><strong>{order.plate || '-'}</strong></div>
             </div>
             <div className="receipt-service-line"><span>Keluhan / servis</span><strong>{order.issue}</strong></div>
-            
+
             <div className="receipt-qr">
-              <img src={qrImageUrl} alt="QR Code Tracking" style={{ width: 108, height: 108 }} />
+              <QRCodeSVG value={trackingUrl} size={108} />
               <strong>{trackingUrl}</strong>
               <span>Scan untuk pantau progres servis Anda.<br />Tanpa instal, tanpa login.</span>
             </div>
-            
+
             <div className="receipt-rule" />
             <p className="receipt-note">Simpan tiket ini untuk pengambilan kendaraan.</p>
             <footer>Terima kasih telah mempercayakan motor Anda.</footer>
